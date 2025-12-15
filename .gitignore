@@ -1,0 +1,21 @@
+# 실제 크롤링 결과 (제외)
+data/*
+!data/sample/
+!data/sample/**
+
+# 이미지
+*.png
+*.jpg
+*.jpeg
+*.webp
+
+# csv (sample 제외)
+*.csv
+!data/sample/*.csv
+
+# env
+.env
+
+# python
+__pycache__/
+*.pyc

@@ -7,7 +7,7 @@ import requests
 from kafka_auction.config.settings import (
     NEXON_API_KEY,
     AUCTION_LISTINGS_URL,
-    TOPIC_LISTINGS,
+    TOPIC_LISTINGS_EQUIPMENTS,
     LOG_LEVEL,
 )
 from kafka_auction.collector.kafka_producer import send_message, producer
@@ -98,7 +98,7 @@ def run_listings_cycle() -> None:
 
             
             send_message(
-                topic=TOPIC_LISTINGS,
+                topic=TOPIC_LISTINGS_EQUIPMENTS,
                 key=full_signature,
                 value=event,
             )
@@ -116,7 +116,7 @@ def run_listings_cycle() -> None:
     }
 
     send_message(
-        topic=TOPIC_LISTINGS,
+        topic=TOPIC_LISTINGS_EQUIPMENTS,
         #key=,
         value=end_event,
         flush=True,  # 마지막에는 flush

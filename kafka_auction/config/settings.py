@@ -26,7 +26,7 @@ KAFKA_BOOTSTRAP_SERVERS = os.getenv(
     "localhost:9092"
 )
 
-TOPIC_LISTINGS = os.getenv("TOPIC_LISTINGS", "auction.raw.listings")
+TOPIC_LISTINGS_EQUIPMENTS = os.getenv("TOPIC_LISTINGS", "auction.raw.listings.equipments")
 TOPIC_HISTORY = os.getenv("TOPIC_HISTORY", "auction.raw.history")
 
 # ─────────────────────────────

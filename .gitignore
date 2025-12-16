@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 실제 크롤링 결과 (제외)
 data/*
 !data/sample/
@@ -19,3 +20,44 @@ data/*
 # python
 __pycache__/
 *.pyc
+=======
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Tool caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local data/logs
+logs/
+*.log
+spool/
+tmp/
+
+# OS/IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.iml
+
+# Env/credentials
+.env
+.env.*
+*.pem
+*.key
+*.crt
+
+>>>>>>> 02f0d1e (chore: remove __pycache__ from tracking and set .gitignore)

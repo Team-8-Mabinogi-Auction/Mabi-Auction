@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Tuple
+import time
 
 import requests
 
@@ -66,6 +67,9 @@ def run_history_cycle() -> None:
     )
 
     cursor = ""
+    # 로깅을 위해 추가
+    page_index = 0      
+    total_items = 0
 
     while True:
         logger.info("Fetching history:  cursor='%s'", cursor)
@@ -77,9 +81,15 @@ def run_history_cycle() -> None:
             break
 
         
+        # 집계 정보 업데이트 및 로깅 코드 수정
+        current_count = len(items)
+        total_items += current_count
+        page_index += 1
+
         logger.info(
             "Received %d items on page_index=%d (cursor='%s')",
-            len(items),
+            current_count,
+            page_index,
             cursor,
         )
 
@@ -122,15 +132,30 @@ def run_history_cycle() -> None:
         flush=True,  # 마지막에는 flush
     )
 
+    # 수정 - 인자 개수 맞춤
     logger.info(
-        "HIstory cycle finished. cycle_id=%s, total_items=%d",
+        "History cycle finished. cycle_id=%s, total_items=%d",
         cycle_started_at,
+        total_items, 
     )
 
 
 if __name__ == "__main__":
     try:
-        run_history_cycle()
+        cycle_count = 0
+        while True:
+            cycle_count += 1
+            if cycle_count > 1:
+                # 2회차부터는 3분 대기
+                logger.info(">>> Waiting for 3 minutes (180 seconds) before next cycle...")
+                time.sleep(180)
+            
+            logger.info(f">>> Execution Start (Cycle {cycle_count})")
+            run_history_cycle()
+    except KeyboardInterrupt:
+        logger.info("Manual interruption detected. Stopping loop.")
+
     finally:
         producer.flush()
         producer.close()
+        logger.info("Producer resources closed. Program terminated.")

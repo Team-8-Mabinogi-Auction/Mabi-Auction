@@ -13,7 +13,7 @@ AUCTION_LISTINGS_URL = os.getenv(
     "https://open.api.nexon.com/mabinogi/v1/auction/list"
 )
 AUCTION_HISTORY_URL = os.getenv(
-    "AUCTION_LISTINGS_URL",
+    "AUCTION_HISTORY_URL",
     "https://open.api.nexon.com/mabinogi/v1/auction/history"
 )
 

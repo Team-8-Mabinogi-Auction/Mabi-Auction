@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # 실제 크롤링 결과 (제외)
 data/*
 !data/sample/
@@ -20,7 +19,6 @@ data/*
 # python
 __pycache__/
 *.pyc
-=======
 # Python artifacts
 __pycache__/
 *.py[cod]
@@ -60,4 +58,3 @@ Thumbs.db
 *.key
 *.crt
 
->>>>>>> 02f0d1e (chore: remove __pycache__ from tracking and set .gitignore)

@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import gzip
 from datetime import datetime, timezone
 
 from kafka_auction.config.settings import KAFKA_BOOTSTRAP_SERVERS, LOG_LEVEL,TOPIC_HISTORY
@@ -62,8 +63,12 @@ def main():
         local_path = os.path.join(SPOOL_DIR, fname)
         return open(local_path, "w", encoding="utf-8"), local_path
 
+    def get_time_partition_path(dt: datetime) -> str:
+        """시간 기반 파티션 경로 생성 (year=YYYY/month=MM/day=DD/hour=HH/minute=MM)"""
+        return f"year={dt.year}/month={dt.month:02d}/day={dt.day:02d}/hour={dt.hour:02d}/minute={dt.minute:02d}"
+
     def close_and_upload():
-        """현재 파일을 닫고 S3에 업로드"""
+        """현재 파일을 닫고 gzip 압축 후 S3에 업로드"""
         nonlocal current_file_handle, current_local_path, current_cycle_id, record_count, cycle_started_at
         
         if current_file_handle is None or current_local_path is None:
@@ -73,9 +78,32 @@ def main():
         current_file_handle.close()
         current_file_handle = None
         
-        # 파일 크기 계산
-        file_size_bytes = os.path.getsize(current_local_path)
-        file_size_mb = file_size_bytes / (1024 * 1024)
+        # 원본 파일 크기 계산
+        original_size_bytes = os.path.getsize(current_local_path)
+        original_size_mb = original_size_bytes / (1024 * 1024)
+        
+        # cycle_id에서 시간 파싱 (ISO 형식: 2025-12-15T08:00:00.123456+00:00)
+        try:
+            cycle_dt = datetime.fromisoformat(current_cycle_id.replace('Z', '+00:00'))
+            if cycle_dt.tzinfo is None:
+                cycle_dt = cycle_dt.replace(tzinfo=timezone.utc)
+        except Exception:
+            # 파싱 실패 시 현재 시간 사용
+            cycle_dt = datetime.now(timezone.utc)
+        
+        # 시간 기반 파티션 경로 생성
+        time_partition = get_time_partition_path(cycle_dt)
+        
+        # gzip 압축
+        compressed_path = current_local_path + ".gz"
+        with open(current_local_path, "rb") as f_in:
+            with gzip.open(compressed_path, "wb") as f_out:
+                f_out.writelines(f_in)
+        
+        # 압축 파일 크기 계산
+        compressed_size_bytes = os.path.getsize(compressed_path)
+        compressed_size_mb = compressed_size_bytes / (1024 * 1024)
+        compression_ratio = (1 - compressed_size_bytes / original_size_bytes) * 100 if original_size_bytes > 0 else 0
         
         # 경과 시간 계산
         elapsed_time = None
@@ -85,26 +113,31 @@ def main():
             elapsed_time = cycle_ended_at - cycle_started_at
             elapsed_seconds = elapsed_time.total_seconds()
         
-        # S3 업로드
-        s3_key = f"{PREFIX}/{os.path.basename(current_local_path)}"
+        # S3 업로드 (압축 파일, 시간 파티션 경로 포함)
+        filename = os.path.basename(compressed_path)
+        s3_key = f"{PREFIX}/{time_partition}/{filename}"
         upload_start = datetime.now(timezone.utc)
-        s3.upload_file(current_local_path, BUCKET, s3_key)
+        s3.upload_file(compressed_path, BUCKET, s3_key)
         upload_elapsed = (datetime.now(timezone.utc) - upload_start).total_seconds()
         
         logger.info(
-            "Cycle completed and uploaded. cycle_id=%s, total_records=%d, file_size=%.2f MB, "
+            "Cycle completed and uploaded. cycle_id=%s, total_records=%d, "
+            "original_size=%.2f MB, compressed_size=%.2f MB (%.1f%% reduction), "
             "processing_time=%.2f seconds (%.2f minutes), upload_time=%.2f seconds, s3_key=%s",
             current_cycle_id,
             record_count,
-            file_size_mb,
+            original_size_mb,
+            compressed_size_mb,
+            compression_ratio,
             elapsed_seconds if elapsed_seconds is not None else 0,
             (elapsed_seconds / 60.0) if elapsed_seconds is not None else 0,
             upload_elapsed,
             f"s3://{BUCKET}/{s3_key}",
         )
         
-        # 로컬 파일 삭제
+        # 로컬 파일 삭제 (원본 + 압축 파일)
         os.remove(current_local_path)
+        os.remove(compressed_path)
         current_local_path = None
         return True
 

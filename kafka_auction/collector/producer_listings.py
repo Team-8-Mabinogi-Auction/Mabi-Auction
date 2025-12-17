@@ -94,15 +94,18 @@ def run_listings_cycle() -> None:
         )
 
         for item in items:
-            # 매칭용 해시
+            # 매칭용 해시 - 매칭 해시 추가(수정)
             full_signature = generate_full_signature(item)
+            match_signature = generate_match_signature(item)
             item["full_signature"] = full_signature
+            item["match_signature"] = match_signature
 
 
             event = {
                 "type": "LISTING",
                 "cycle_id": cycle_started_at,   # 이 호출 주기 식별자 (나중에 S3에서 묶어보기 좋음)
                 "item_id" : full_signature,
+                "match_id": match_signature,
                 "raw": item,
             }
 

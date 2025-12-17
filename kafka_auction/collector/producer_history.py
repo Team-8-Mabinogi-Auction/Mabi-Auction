@@ -102,7 +102,7 @@ def run_history_cycle() -> None:
             event = {
                 "type": "HISTORY",
                 "cycle_id": cycle_started_at,   # 이 호출 주기 식별자 (나중에 S3에서 묶어보기 좋음)
-                "item_id" : match_signature,
+                "match_id" : match_signature,   # 고유 아이템 해시와 혼동 우려로 변경
                 "raw": item,
             }
 

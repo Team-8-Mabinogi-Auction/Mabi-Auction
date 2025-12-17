@@ -1,410 +1,335 @@
 import json
 import time
 import redis
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from datetime import datetime, timedelta, timezone
+import logging
 from kafka import KafkaConsumer, KafkaProducer
+from datetime import datetime, timedelta
+from utils import convert_utc_to_kst, calculate_start_time
 
-from utils import generate_match_signature
+# 로깅 설정
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger("AuctionProcessor")
 
-# 설정] ---
+# 설정
 KAFKA_BOOTSTRAP_SERVERS = ['localhost:9092']
 REDIS_HOST = 'localhost'
-REDIS_PORT = 6379
 
 TOPIC_RAW_LISTINGS = 'auction.raw.listings.equipments' 
 TOPIC_RAW_HISTORY = 'auction.raw.history'   
 TOPIC_EVENTS = 'auction.events'   
 
-KEY_SNAPSHOT_MASTER = 'snapshot:master'
-KEY_SNAPSHOT_WORKING = 'snapshot:working'
-KEY_VERIFY_PENDING = 'verify:pending'
+# Redis Keys
+KEY_LISTINGS_ACTIVE = 'listings:active'          
+KEY_MAP_ITEM_TO_MATCH = 'listings:map:item_to_match'
+KEY_SNAPSHOT_MASTER = 'listings:snapshot:master' 
+KEY_SNAPSHOT_WORKING = 'listings:snapshot:working'
 
+KEY_LISTINGS_PENDING = 'listings:pending'        
+KEY_HISTORY_CANDIDATES = 'history:candidates'    
+KEY_PROCESSED_IDS = 'history:processed_ids'      
 KEY_PREFIX_HISTORY_SEEN = 'history:seen:'
 
-HISTORY_BUFFER_TTL = 120
-TIMEOUT_SECONDS = 200 # 넉넉하게 잡음
-KST = timezone(timedelta(hours=9))
+KEY_HISTORY_GHOST_BUFFER = 'history:ghost_buffer'
 
-# DB 접속 정보
-DB_CONFIG = {
-    'host': 'localhost',
-    'dbname': 'mydatabase',
-    'user': 'myuser',
-    'password': 'mypassword',
-    'port': 5432
-}
+# Time Constants
+PROCESSED_TTL = 600       
+PENDING_GRACE_PERIOD = 600 
+GHOST_TTL_SECONDS = 400  
+HISTORY_DEDUP_TTL = 3660 
 
-# 연결
-redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0, decode_responses=True)
-
-consumer = KafkaConsumer(
-    bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
-    value_deserializer=lambda m: json.loads(m.decode('utf-8')),
-    group_id='processor-group-combined-test2', 
-    auto_offset_reset='latest'
-)
-consumer.subscribe([TOPIC_RAW_LISTINGS, TOPIC_RAW_HISTORY])
-
+# 초기화
+redis_client = redis.Redis(host=REDIS_HOST, port=6379, db=0, decode_responses=True)
 producer = KafkaProducer(
     bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
     value_serializer=lambda v: json.dumps(v).encode('utf-8')
 )
+consumer = KafkaConsumer(
+    bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+    value_deserializer=lambda m: json.loads(m.decode('utf-8')),
+    group_id='processor-group-final-ghost-buffer-v1', 
+    auto_offset_reset='latest'
+)
+consumer.subscribe([TOPIC_RAW_LISTINGS, TOPIC_RAW_HISTORY])
 
-print(f"데이터 수신 대기중... (Buffer TTL: {HISTORY_BUFFER_TTL}s)")
+logger.info("Processor Started (Ghost Buffer Mode)")
+
+# 최초 실행
+is_first_cycle = not bool(redis_client.exists(KEY_SNAPSHOT_MASTER))
+if is_first_cycle:
+    logger.info("Initial Run : 'start_time' will be None. Time validation skipped.")
 
 
-# 유틸리티 함수
-
-def get_db_connection():
-    return psycopg2.connect(**DB_CONFIG)
-
-def convert_utc_to_kst(utc_time_str):
-    if not utc_time_str: return None
-    try:
-        dt_utc = datetime.fromisoformat(utc_time_str.replace('Z', '+00:00'))
-        dt_kst = dt_utc.astimezone(KST)
-        return dt_kst.isoformat()
-    except Exception as e:
-        print(f"시간 변환 오류 ({utc_time_str}): {e}")
-        return None
-
-def calculate_start_time(expire_time_str):
-    now_kst = datetime.now(KST)
-    DEFAULT_DURATION = 36 
-    if not expire_time_str:
-        return now_kst.isoformat(), now_kst.isoformat(), DEFAULT_DURATION
-    try:
-        expire_time_kst_str = convert_utc_to_kst(expire_time_str)
-        expire_dt_kst = datetime.fromisoformat(expire_time_kst_str)
-        diff_seconds = expire_dt_kst.timestamp() - now_kst.timestamp()
-        hours_left = diff_seconds / 3600
-        if hours_left <= 0:
-            start_dt = expire_dt_kst - timedelta(hours=DEFAULT_DURATION)
-            return start_dt.isoformat(), DEFAULT_DURATION
-        candidates = [6, 12, 24, 36, 48, 72]
-        duration = candidates[-1]
-        for cand in candidates:
-            if cand >= hours_left:
-                duration = cand
-                break
-        start_dt = expire_dt_kst - timedelta(hours=duration)
-        return start_dt.isoformat(), expire_dt_kst.isoformat(), duration
-    except Exception:
-        return now_kst.isoformat(), now_kst.isoformat(), DEFAULT_DURATION
-
-def emit_event(event_type, item_data, final_price=None, sold_time=None):
-    if isinstance(item_data, str):
-        item_data = json.loads(item_data)
+def emit_event(event_type, item_id, match_id=None, listing_data=None, history_data=None):
     event = {
         'event_type': event_type,
+        'item_id': item_id,       # Unique Signature
+        'match_id': match_id,     # Match Signature
         'processed_at': datetime.now().isoformat(),
-        'item_id': item_data.get('item_id'),
-        'item_display_name': item_data.get('item_display_name') or item_data.get('item_name'),
-        'raw_data': item_data
+        'payload': {}
     }
-    if final_price: event['sold_price'] = final_price
-    if sold_time: event['sold_time'] = sold_time
+
+    if event_type == 'REGISTER' and listing_data:
+        event['payload']['listing_data'] = listing_data
+    elif event_type == 'SOLD' and history_data:
+        event['payload']['history_data'] = history_data
+    elif event_type == 'CANCEL':
+        pass 
+    
     producer.send(TOPIC_EVENTS, event)
 
-def get_db_item_signature(db_data):
-    # 1. 이름 매핑
-    name = db_data.get('item_display_name')
-    price = db_data.get('price')
-    options = db_data.get('item_option') or []
 
-    adapter = {
-        "item_display_name": name,
-        "auction_price_per_unit": price,
-        "item_option": options
-    }
+def validate_time(redis_meta, raw_history):
+    start_time_str = redis_meta.get('start_time')
+    sold_time_kst_str = convert_utc_to_kst(raw_history.get('date_auction_buy'))
+    
+    # start_time_str이 존재하는 경우에만 검증
+    if start_time_str and sold_time_kst_str:
+        dt_start = datetime.fromisoformat(start_time_str)
+        dt_sold = datetime.fromisoformat(sold_time_kst_str)
+        tolerance = timedelta(minutes=2)
+        
+        # 판매 시간이 등록 시간보다 과도하게 이르면 무시
+        if dt_sold < (dt_start - tolerance):
+            return False
+            
+    return True
 
-    return generate_match_signature(adapter)
+# 핵심 로직
 
-def fetch_items_from_db(item_ids):
-    if not item_ids: return []
-    conn = get_db_connection()
-    results = []
-    try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            batch_size = 1000
-            total_ids = list(item_ids)
-            for i in range(0, len(total_ids), batch_size):
-                batch_list = total_ids[i : i + batch_size]
-                batch_tuple = tuple(batch_list)
-                
-                sql = """
-                    SELECT 
-                        l.*,
-                        COALESCE(
-                            json_agg(
-                                json_build_object(
-                                    'option_type', o.option_type,
-                                    'option_sub_type', o.option_sub_type,
-                                    'option_value', o.option_value,
-                                    'option_value2', o.option_value2,
-                                    'option_desc', o.option_desc
-                                )
-                            ) FILTER (WHERE o.item_id IS NOT NULL), 
-                            '[]'
-                        ) as item_option
-                    FROM mabi_auction.current_listings l
-                    LEFT JOIN mabi_auction.item_options o ON l.item_id = o.item_id
-                    WHERE l.item_id IN %s
-                    GROUP BY l.item_id
-                """
-                
-                cur.execute(sql, (batch_tuple,))
-                rows = cur.fetchall()
-                for row in rows:
-                    for k, v in row.items():
-                        if isinstance(v, datetime): row[k] = v.isoformat()
-                    results.append(row)
-    except Exception as e:
-        print(f"DB 조회 오류: {e}")
-    finally:
-        conn.close()
-    return results
+def process_hybrid_history(data):
+    # History match_id -> Active 조회
+    target_match_id = data.get('match_id')
+    raw_history = data.get('raw')
+    
+    if not target_match_id or not raw_history: return
+    auction_buy_id = raw_history.get('auction_buy_id')
 
+    # 1. Active 확인
+    active_val = redis_client.hget(KEY_LISTINGS_ACTIVE, target_match_id)
+    
+    if active_val:
+        # 리스트에 있음 -> Candidate 등록
+        redis_meta = json.loads(active_val)
+        item_id = redis_meta.get('item_id') 
+        
+        if not validate_time(redis_meta, raw_history): return
 
-# 매물(Listings) 처리
+        candidate_data = {
+            'buy_id': auction_buy_id,
+            'history_data': raw_history,
+            'match_id': target_match_id
+        }
+        redis_client.hset(KEY_HISTORY_CANDIDATES, item_id, json.dumps(candidate_data))
+        return
+
+    # 2. Active에 없음 -> 이미 처리됐는지 확인
+    if redis_client.get(f"{KEY_PROCESSED_IDS}:{target_match_id}"): return
+
+    # 3. Active X, Pending X -> Listing이 늦게 올 수 있으므로 일단 버퍼에 보관
+    raw_history['received_at'] = time.time()
+    history_str = json.dumps(raw_history)
+    
+    redis_client.hset(KEY_HISTORY_GHOST_BUFFER, target_match_id, history_str)
+    logger.info(f"Ghost Candidate {target_match_id} buffered.")
+
 
 def process_listing_message(data):
+    global is_first_cycle
+
+    # [Cycle End] 처리 로직
     if data.get('type') == 'END_OF_CYCLE':
-        cycle_id = data.get('cycle_id')
-        print(f"\n 사이클 종료({cycle_id}). 삭제 감지 시작...")
+        logger.info("Cycle End Processing...")
         
-        deleted_uuids = redis_client.sdiff(KEY_SNAPSHOT_MASTER, KEY_SNAPSHOT_WORKING)
+        active_item_ids = set(redis_client.hkeys(KEY_MAP_ITEM_TO_MATCH))
+        working_item_ids = redis_client.smembers(KEY_SNAPSHOT_WORKING)
         
-        if deleted_uuids:
-            print(f"{len(deleted_uuids)}개의 사라진 ID 발견. DB 조회 시작")
-            deleted_items = fetch_items_from_db(deleted_uuids)
+        missing_item_ids = active_item_ids - working_item_ids
+        
+        pipeline = redis_client.pipeline()
+        
+        for missing_id in missing_item_ids:
+            match_id = redis_client.hget(KEY_MAP_ITEM_TO_MATCH, missing_id)
             
-            pipe = redis_client.pipeline()
-            for item_data in deleted_items:
-                uuid = item_data['item_id']
-                print(f"[DB-DEL] {item_data.get('item_display_name')} ({item_data.get('price'):,}G) | ID:{uuid}")
-                pending_val = {
-                    'data': json.dumps(item_data, default=str), 
-                    'deleted_at': time.time()
-                }
-                pipe.hset(KEY_VERIFY_PENDING, uuid, json.dumps(pending_val))
+            if redis_client.exists(f"{KEY_PROCESSED_IDS}:{missing_id}"):
+                if match_id: pipeline.hdel(KEY_LISTINGS_ACTIVE, match_id)
+                pipeline.hdel(KEY_MAP_ITEM_TO_MATCH, missing_id)
+                pipeline.hdel(KEY_HISTORY_CANDIDATES, missing_id)
+                continue
             
-            pipe.execute()
-            print(f"   -> {len(deleted_items)}개 매물 Pending 이동 완료.")
-        else:
-            print("   -> 사라진 매물이 없습니다.")
+            active_val = None
+            if match_id:
+                active_val = redis_client.hget(KEY_LISTINGS_ACTIVE, match_id)
+            
+            if not active_val: 
+                pipeline.hdel(KEY_MAP_ITEM_TO_MATCH, missing_id)
+                continue
+
+            candidate_str = redis_client.hget(KEY_HISTORY_CANDIDATES, missing_id)
+            
+            if candidate_str:
+                cand = json.loads(candidate_str)
+                emit_event('SOLD', item_id=missing_id, match_id=match_id, history_data=cand['history_data'])
+                
+                pipeline.setex(f"{KEY_PROCESSED_IDS}:{missing_id}", PROCESSED_TTL, cand['buy_id'])
+                if match_id: pipeline.hdel(KEY_LISTINGS_ACTIVE, match_id)
+                pipeline.hdel(KEY_MAP_ITEM_TO_MATCH, missing_id)
+                pipeline.hdel(KEY_HISTORY_CANDIDATES, missing_id)
+            else:
+                meta = json.loads(active_val)
+                meta['deleted_at'] = time.time()
+                
+                pipeline.hset(KEY_LISTINGS_PENDING, missing_id, json.dumps(meta))
+                if match_id: pipeline.hdel(KEY_LISTINGS_ACTIVE, match_id)
+                pipeline.hdel(KEY_MAP_ITEM_TO_MATCH, missing_id)
+                
+        pipeline.execute()
         
         redis_client.delete(KEY_SNAPSHOT_MASTER)
         redis_client.rename(KEY_SNAPSHOT_WORKING, KEY_SNAPSHOT_MASTER)
-        final_listing_count = redis_client.scard(KEY_SNAPSHOT_MASTER)
-        print(f"Listings Cycle Complete. 현재 총 매물: {final_listing_count}개\n")
+        if is_first_cycle: is_first_cycle = False
         return
 
-    process_listing(data)
-
-def process_listing(data):
+    # 개별 매물 등록 처리 (KST 시간 적용)
     item_id = data.get('item_id')
+    match_id = data.get('match_id')
     raw_item = data.get('raw')
-    if not raw_item: return
+
+    if not item_id or not raw_item: return
     
-    raw_item['item_id'] = item_id
     pipe = redis_client.pipeline()
 
-    if not redis_client.sismember(KEY_SNAPSHOT_MASTER, item_id):
-        start_kst, expire_kst, duration = calculate_start_time(raw_item.get('date_auction_expire'))
+    # Active에 없는 신규 매물인 경우
+    if not redis_client.hexists(KEY_LISTINGS_ACTIVE, match_id):
+        
+        # 1. 등록 시간 역산
+        raw_expire = raw_item.get('date_auction_expire')
+        start_kst, expire_kst, duration = calculate_start_time(raw_expire)
+        
+        # KST 변환
         raw_item['start_time'] = start_kst
         raw_item['auction_duration'] = duration
-        raw_item['date_auction_expire'] = expire_kst
-        emit_event('REGISTER', raw_item)
+        raw_item['date_auction_expire'] = expire_kst 
+        
+        # 2. Kafka: 등록 이벤트 발행 (raw_item 전송)
+        emit_event('REGISTER', item_id=item_id, match_id=match_id, listing_data=raw_item)
 
-    pipe.sadd(KEY_SNAPSHOT_WORKING, item_id)    
+        # 3. Redis Active 저장
+        meta = {
+            'item_id': item_id, 
+            'start_time': start_kst,
+            'expire_time': expire_kst,
+            'auction_duration': duration
+        }
+        pipe.hset(KEY_LISTINGS_ACTIVE, match_id, json.dumps(meta))
+
+        # 4. Redis Map 저장
+        pipe.hset(KEY_MAP_ITEM_TO_MATCH, item_id, match_id)
+    
+    # Snapshot 업데이트
+    pipe.sadd(KEY_SNAPSHOT_WORKING, item_id)
     pipe.execute()
 
-
-# 판매(History) 처리
-
-def process_history_batch(history_items):
-    """
-    history_items: [{'raw': item, 'ts': timestamp, 'sig': signature}, ...]
-    """
-    if not history_items:
-        return set()
-
-    all_pending = redis_client.hgetall(KEY_VERIFY_PENDING)
-    if not all_pending:
-        return set()
-
-    # Lookup Table 생성
-    pending_map = {}
-    for uuid, val_str in all_pending.items():
-        try:
-            db_data = json.loads(json.loads(val_str)['data'])
-            sig = get_db_item_signature(db_data)
-            pending_map[sig] = (uuid, db_data)
-        except:
-            continue
-
-    pipeline = redis_client.pipeline()
-    matched_uuids = set()
-    matched_signatures = set()
-    sold_count = 0
-
-    # 매칭 시작
-    for history_item_wrapper in history_items:
-        history_raw = history_item_wrapper['raw'] 
-        h_sig = history_item_wrapper['sig']
-
-        # 표시용 정보
-        h_name = history_raw.get('item_display_name')
-        h_price = history_raw.get('auction_price_per_unit')    
-        
-        if h_sig in pending_map:
-            uuid, db_data = pending_map[h_sig]
-            
-            if uuid not in matched_uuids:
-                matched_uuids.add(uuid)
-                matched_signatures.add(h_sig)
-                
-                pipeline.hdel(KEY_VERIFY_PENDING, uuid)
-
-                raw_sold_time = history_raw.get('date_auction_buy')
-                sold_time_kst = convert_utc_to_kst(raw_sold_time)
-                
-                emit_event(
-                    'SOLD', 
-                    db_data,
-                    final_price=history_raw.get('auction_price_per_unit'),
-                    sold_time=sold_time_kst
-                )
-                sold_count += 1
-                
-                del pending_map[h_sig]
-                
-                print(f"판매 확인: {db_data.get('item_display_name')} - {history_raw.get('auction_price_per_unit')} Gold")
-        else:
-            print(f"[MISS..] {h_name} ({h_price:,}G) | Sig:{h_sig}")
-
-    if sold_count > 0:
-        pipeline.execute()
-        print(f"총 {sold_count}건 판매 확인 완료")
-
-    return matched_signatures
-
-
-# 타임아웃 관리
-
-def check_timeouts():
-    all_pending = redis_client.hgetall(KEY_VERIFY_PENDING)
-    now = time.time()
-    count = 0
-    pipeline = redis_client.pipeline()
+    # 판매 데이터보다 늦게 전송된 Listing 처리
+    ghost_history_str = redis_client.hget(KEY_HISTORY_GHOST_BUFFER, match_id)
     
-    for uuid, val_str in all_pending.items():
-        try:
-            pending_obj = json.loads(val_str)
-            deleted_at = pending_obj.get('deleted_at', 0)
+    if ghost_history_str:
+        history_data = json.loads(ghost_history_str)
+        
+        # 위에서 KST로 변환한 raw_item 값을 그대로 사용
+        meta_for_check = {
+            'start_time': raw_item.get('start_time'), 
+            'expire_time': raw_item.get('date_auction_expire')
+        }
+        
+        if validate_time(meta_for_check, history_data):
+            buy_id = history_data.get('auction_buy_id')
             
-            if now - deleted_at > TIMEOUT_SECONDS:
-                pipeline.hdel(KEY_VERIFY_PENDING, uuid)
-                db_data = json.loads(pending_obj['data'])
-                emit_event('CANCEL', db_data)
-                count += 1
-        except:
-            continue
-            
-    if count > 0:
-        pipeline.execute()
-        print(f"[타임아웃] {count}개 아이템 CANCEL 처리 완료")
+            emit_event('SOLD', item_id=item_id, match_id=match_id, history_data=history_data)
+            logger.info(f"Late Matching Success! {item_id}")
 
+            p2 = redis_client.pipeline()
+            p2.setex(f"{KEY_PROCESSED_IDS}:{match_id}", PROCESSED_TTL, buy_id)
+            p2.hdel(KEY_LISTINGS_ACTIVE, match_id)
+            p2.hdel(KEY_HISTORY_GHOST_BUFFER, match_id)
+            p2.hdel(KEY_MAP_ITEM_TO_MATCH, item_id)
+            p2.execute()
+
+# 타임 아웃 처리 (취소 매물 체크)
+def check_timeouts():
+    now = time.time()
+    pipe = redis_client.pipeline()
+    
+    # 1. Pending Timeout 처리
+    all_pending = redis_client.hgetall(KEY_LISTINGS_PENDING)
+    for item_id, val_str in all_pending.items():
+        try:
+            meta = json.loads(val_str)
+            if now - meta.get('deleted_at', 0) > PENDING_GRACE_PERIOD:
+                pipe.hdel(KEY_LISTINGS_PENDING, item_id)
+                match_id = meta.get('match_id')
+                emit_event('CANCEL', item_id=item_id, match_id=match_id)
+        except: continue
+        
+    # 2. 버퍼에 너무 오래 머무른 History는 진짜 유령매물로 처리
+    ghost_buffer = redis_client.hgetall(KEY_HISTORY_GHOST_BUFFER)
+    ghost_count = 0
+    
+    for match_id, val_str in ghost_buffer.items():
+        try:
+            history_data = json.loads(val_str)
+            received_at = history_data.get('received_at', 0)
+            
+            if now - received_at > GHOST_TTL_SECONDS:
+                # Ghost SOLD 이벤트 발행
+                emit_event('SOLD', item_id=None, match_id=match_id, history_data=history_data)
+                
+                # 처리 기록 및 버퍼 삭제
+                pipe.setex(f"{KEY_PROCESSED_IDS}:{match_id}", PROCESSED_TTL, history_data.get('auction_buy_id'))
+                pipe.hdel(KEY_HISTORY_GHOST_BUFFER, match_id)
+                ghost_count += 1
+        except: continue
+
+    pipe.execute()
+    if ghost_count > 0:
+        logger.info(f"Timeout: {ghost_count} items confirmed as GHOST-SOLD.")
 
 # 실행 루프
 
 last_timeout_check = time.time()
-last_history_process = time.time()
-history_buffer = []
-
-HISTORY_PROCESS_INTERVAL = 1.0
 
 try:
     while True:
         msg_pack = consumer.poll(timeout_ms=100)
         
-        # [수정] NoneType Error 방어 코드
-        if msg_pack is None:
-            continue
-
-        for tp, messages in msg_pack.items():
-            # [수정] NoneType Error 방어 코드
-            if messages is None:
-                continue
-
-            topic_name = tp.topic
-            
-            for message in messages:
-                data = message.value
-                
-                if topic_name == TOPIC_RAW_LISTINGS:
-                    process_listing_message(data)
-
-                elif topic_name == TOPIC_RAW_HISTORY:
-
-                    raw_item = data.get('raw')
+        if msg_pack:
+            for tp, messages in msg_pack.items():
+                for message in messages:
                     
-                    if raw_item and data.get('type') != 'END_OF_CYCLE':
-                        sig = data.get('item_id') or generate_match_signature(raw_item)
+                    if tp.topic == TOPIC_RAW_LISTINGS:
+                        process_listing_message(message.value)
                         
-                        sold_time = raw_item.get('date_auction_buy')
-                        dedup_key = f"{KEY_PREFIX_HISTORY_SEEN}{sig}:{sold_time}"
-                        
-                        if redis_client.set(dedup_key, "1", ex=3600, nx=True):
-                            history_buffer.append({
-                                'raw': raw_item,
-                                'ts': time.time(), 
-                                'sig': sig 
-                            })
+                    elif tp.topic == TOPIC_RAW_HISTORY:
+                        # History 데이터 처리
+                        raw_history = message.value.get('raw')
+                        if raw_history:
+                            buy_id = raw_history.get('auction_buy_id')
+                            dedup_key = f"{KEY_PREFIX_HISTORY_SEEN}{buy_id}"
+                            
+                            if redis_client.set(dedup_key, "1", ex=HISTORY_DEDUP_TTL, nx=True):
+                                process_hybrid_history(message.value)
 
-        # History 배치 처리 ---
-        current_time = time.time()
-        if current_time - last_history_process >= HISTORY_PROCESS_INTERVAL:
-            if history_buffer:
-                matched_sigs = process_history_batch(history_buffer)
-                
-                new_buffer = []
-                expire_count = 0
-                
-                for wrapper in history_buffer:
-                    if wrapper['sig'] in matched_sigs:
-                        continue
-                        
-                    if current_time - wrapper['ts'] > HISTORY_BUFFER_TTL:
-                        expire_count += 1
-                        continue
-                        
-                    new_buffer.append(wrapper)
-                
-                if expire_count > 0:
-                    print(f"{expire_count}개 History 아이템 만료되어 버퍼 제거")
-                    
-                history_buffer = new_buffer
-            
-            last_history_process = current_time
-
-        if current_time - last_timeout_check > 10:
+        if time.time() - last_timeout_check > 10:
             check_timeouts()
-            last_timeout_check = current_time
-
-except KeyboardInterrupt:
-    print("프로세서 종료 요청됨")
+            last_timeout_check = time.time()
 
 except Exception as e:
-    print(f"치명적인 오류 발생: {e}")
-    import traceback
-    traceback.print_exc() # 에러 위치 상세 확인
-    
+    logger.error(f"Unexpected Error: {e}", exc_info=True)
 finally:
     consumer.close()
     producer.close()
     redis_client.close()
-    print("프로그램 종료")
+    logger.info("Program Terminated")

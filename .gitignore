@@ -1,1 +1,59 @@
+# 실제 크롤링 결과 (제외)
+data/*
+!data/sample/
+!data/sample/**
+
+# 이미지
+*.png
+*.jpg
+*.jpeg
+*.webp
+
+# csv (sample 제외)
+*.csv
+!data/sample/*.csv
+
+# env
 .env
+
+# python
+__pycache__/
+*.pyc
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Tool caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local data/logs
+logs/
+*.log
+spool/
+tmp/
+
+# OS/IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.iml
+
+# Env/credentials
+.env
+.env.*
+*.pem
+*.key
+*.crt

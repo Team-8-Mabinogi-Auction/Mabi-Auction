@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Tuple
+import time
 
 import requests
 
@@ -81,6 +82,11 @@ def run_history_cycle() -> None:
             break
 
         
+        # 집계 정보 업데이트 및 로깅 코드 수정
+        current_count = len(items)
+        total_items += current_count
+        page_index += 1
+
         logger.info(
             "Received %d items: page_number= '%d'(cursor='%s')",
             len(items),
@@ -100,7 +106,7 @@ def run_history_cycle() -> None:
             event = {
                 "type": "HISTORY",
                 "cycle_id": cycle_started_at,   # 이 호출 주기 식별자 (나중에 S3에서 묶어보기 좋음)
-                "item_id" : match_signature,
+                "match_id" : match_signature,   # 고유 아이템 해시와 혼동 우려로 변경
                 "raw": item,
             }
 
@@ -147,7 +153,20 @@ def run_history_cycle() -> None:
 
 if __name__ == "__main__":
     try:
-        run_history_cycle()
+        cycle_count = 0
+        while True:
+            cycle_count += 1
+            if cycle_count > 1:
+                # 2회차부터는 3분 대기
+                logger.info(">>> Waiting for 3 minutes (180 seconds) before next cycle...")
+                time.sleep(180)
+            
+            logger.info(f">>> Execution Start (Cycle {cycle_count})")
+            run_history_cycle()
+    except KeyboardInterrupt:
+        logger.info("Manual interruption detected. Stopping loop.")
+
     finally:
         producer.flush()
         producer.close()
+        logger.info("Producer resources closed. Program terminated.")

@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Tuple
+import time
 
 import requests
 
@@ -80,6 +81,11 @@ def run_listings_cycle() -> None:
             break
 
         
+        # 집계 정보 업데이트 및 로깅 인자 수정
+        current_count = len(items)
+        total_items += current_count
+        page_index += 1
+        
         logger.info(
             "Received %d items: page_number= '%d'(cursor='%s')",
             len(items),
@@ -91,15 +97,18 @@ def run_listings_cycle() -> None:
         cursor_cnt += 1
 
         for item in items:
-            # 매칭용 해시
+            # 매칭용 해시 - 매칭 해시 추가(수정)
             full_signature = generate_full_signature(item)
+            match_signature = generate_match_signature(item)
             item["full_signature"] = full_signature
+            item["match_signature"] = match_signature
 
 
             event = {
                 "type": "LISTING",
                 "cycle_id": cycle_started_at,   # 이 호출 주기 식별자 (나중에 S3에서 묶어보기 좋음)
                 "item_id" : full_signature,
+                "match_id": match_signature,
                 "raw": item,
             }
 
@@ -146,7 +155,20 @@ def run_listings_cycle() -> None:
 
 if __name__ == "__main__":
     try:
-        run_listings_cycle()
+        cycle_count = 0
+        while True:
+            cycle_count += 1
+            if cycle_count > 1:
+                # 2회차부터는 3분 대기
+                logger.info(">>> Waiting for 3 minutes (180 seconds) before next cycle...")
+                time.sleep(180)
+            
+            logger.info(f">>> Execution Start (Cycle {cycle_count})")
+            run_listings_cycle()
+    except KeyboardInterrupt:
+        logger.info("Manual interruption detected. Stopping loop.")
+
     finally:
         producer.flush()
         producer.close()
+        logger.info("Producer resources closed. Program terminated.")

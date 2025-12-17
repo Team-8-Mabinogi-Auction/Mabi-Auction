@@ -58,6 +58,7 @@ def run_listings_cycle() -> None:
     cycle_started_at = cycle_started_at_dt.isoformat()
 
     auction_item_category = "모자/가발"
+    # auction_item_category = ""  # 전체 데이터 가져올 때 공란으로 사용
 
     logger.info(
         "Starting listings cycle for category='%s', cycle_id=%s",
@@ -66,22 +67,28 @@ def run_listings_cycle() -> None:
     )
 
     cursor = ""
+    cursor_cnt = 0
+    items_cnt = 0
 
     while True:
-        logger.info("Fetching listings:  cursor='%s'", cursor)
+        logger.info("Fetching listings: page_number= '%d'(cursor='%s')", cursor_cnt, cursor)
 
         try:
             items, next_cursor = fetch_listings_page(cursor, auction_item_category)
         except Exception:
-            logger.exception("Error while fetching listings (cursor=%s)", cursor)
+            logger.exception("Error while fetching listings: page_number= '%d'(cursor='%s')", cursor_cnt, cursor)
             break
 
         
         logger.info(
-            "Received %d items on page_index=%d (cursor='%s')",
+            "Received %d items: page_number= '%d'(cursor='%s')",
             len(items),
+            cursor_cnt,
             cursor,
         )
+
+        items_cnt += len(items)
+        cursor_cnt += 1
 
         for item in items:
             # 매칭용 해시
@@ -122,9 +129,18 @@ def run_listings_cycle() -> None:
         flush=True,  # 마지막에는 flush
     )
 
+    # 사이클 종료 시각 및 경과 시간 계산
+    cycle_ended_at_dt = datetime.now(timezone.utc)
+    elapsed_time = cycle_ended_at_dt - cycle_started_at_dt
+    elapsed_seconds = elapsed_time.total_seconds()
+
     logger.info(
-        "Listings cycle finished. cycle_id=%s, total_items=%d",
+        "Listings cycle finished. cycle_id=%s, total_items_cnt=%d, page_cnt=%d, elapsed_time=%.2f seconds (%.2f minutes)",
         cycle_started_at,
+        items_cnt,
+        cursor_cnt,
+        elapsed_seconds,
+        elapsed_seconds / 60.0,
     )
 
 

@@ -83,8 +83,8 @@ def run_listings_cycle() -> None:
         
         # 집계 정보 업데이트 및 로깅 인자 수정
         current_count = len(items)
-        total_items += current_count
-        page_index += 1
+        # total_items += current_count
+        # page_index += 1
         
         logger.info(
             "Received %d items: page_number= '%d'(cursor='%s')",

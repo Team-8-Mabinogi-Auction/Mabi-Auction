@@ -34,6 +34,7 @@ KEY_PROCESSED_IDS = 'history:processed_ids'
 KEY_PREFIX_HISTORY_SEEN = 'history:seen:'
 
 KEY_HISTORY_GHOST_BUFFER = 'history:ghost_buffer'
+KEY_RECENT_ITEMS = 'recent:items'
 
 # Time Constants
 PROCESSED_TTL = 600       
@@ -228,6 +229,33 @@ def process_listing_message(data):
 
         # 4. Redis Map 저장
         pipe.hset(KEY_MAP_ITEM_TO_MATCH, item_id, match_id)
+
+        # [추가 기능] 최신 매물 100개 유지 (Sorted Set 활용 - 시간 순 정렬)
+        recent_info = {
+            'item_id': item_id,
+            'item_name': raw_item.get('item_name'),
+            'item_category': raw_item.get('item_category'),
+            'price_per_unit': raw_item.get('auction_price_per_unit'),
+            'item_count': raw_item.get('item_count'),
+            'total_price': raw_item.get('auction_price_per_unit') * raw_item.get('item_count'),
+            'registered_at': raw_item.get('start_time'),
+            'expire_time': raw_item.get('date_auction_expire'),
+            'duration': raw_item.get('auction_duration'),
+        }
+        
+        # start_time(ISO형식)을 timestamp(숫자)로 변환하여 정렬 기준으로 사용
+        try:
+            # ISO 시간 문자열(2025-12-15T08:00:00...)을 숫자로 변환
+            score = datetime.fromisoformat(raw_item.get('start_time').replace('Z', '+00:00')).timestamp()
+            
+            # ZSET에 추가 (값은 JSON 문자열, 점수는 타임스탬프)
+            pipe.zadd(KEY_RECENT_ITEMS, {json.dumps(recent_info, ensure_ascii=False): score})
+            
+            # 전체 개수 중 오래된 순서(작은 점수)대로 잘라내어 상위 100개만 유지
+            # zremrangebyrank는 0부터 시작하므로, -101 이하는 모두 삭제
+            pipe.zremrangebyrank(KEY_RECENT_ITEMS, 0, -101)
+        except Exception as e:
+            logger.warning(f"Failed to add to recent:items: {e}")
     
     # Snapshot 업데이트
     pipe.sadd(KEY_SNAPSHOT_WORKING, item_id)

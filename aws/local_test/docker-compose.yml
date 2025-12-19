@@ -30,7 +30,7 @@ services:
 
   # EC2-3 대용 : PostgreSQL (Airflow MetaDB + Auction Log 데이터 저장소)
   postgres:
-    image: postgres:13
+    image: postgres:15
     container_name: ec2-postgres
     environment:
       - POSTGRES_USER=airflow

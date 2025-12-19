@@ -76,7 +76,11 @@ def run_listings_cycle() -> None:
             logger.exception("Error while fetching listings: page_number= '%d'(cursor='%s')", cursor_cnt, cursor)
             break
 
-        # [수정됨] 에러를 유발하던 불필요한 변수 연산(total_items, page_index) 삭제함
+        
+        # 집계 정보 업데이트 및 로깅 인자 수정
+        current_count = len(items)
+        # total_items += current_count
+        # page_index += 1
         
         logger.info(
             "Received %d items: page_number= '%d'(cursor='%s')",

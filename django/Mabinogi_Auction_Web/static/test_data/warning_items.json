@@ -1,0 +1,38 @@
+[
+    {
+        "id": "AUC-1029",
+        "name": "탈틴 농장 강화 섬유",
+        "price": "45,000",
+        "level": "경고",
+        "reason_code": "01",
+        "reason_label": "매물 급감",
+        "reason_detail": "최근 1시간 내 전체 매물의 70%가 일괄 소진되었습니다."
+    },
+    {
+        "id": "AUC-3342",
+        "name": "적철괴",
+        "price": "2,800",
+        "level": "의심",
+        "reason_code": "02",
+        "reason_label": "반복 매수",
+        "reason_detail": "특정 ID에 의해 저가 매물이 지속적으로 수집되고 있습니다."
+    },
+    {
+        "id": "AUC-5501",
+        "name": "잔망루피 붕붕이 카트 호루라기",
+        "price": "12,500,000",
+        "level": "경고",
+        "reason_code": "03",
+        "reason_label": "시세 조작",
+        "reason_detail": "평균 거래가 대비 200% 이상 높은 가격으로 매물이 등록되었습니다."
+    },
+    {
+        "id": "AUC-9982",
+        "name": "비바체 이펙트 변경 카드(핑크 플라워 컨페티) 쿠폰",
+        "price": "8,900,000",
+        "level": "의심",
+        "reason_code": "04",
+        "reason_label": "대량 등록",
+        "reason_detail": "동일한 가격의 매물이 일시에 10개 이상 업로드된 정황이 있습니다."
+    }
+]

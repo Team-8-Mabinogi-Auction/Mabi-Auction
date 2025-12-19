@@ -1,0 +1,206 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ item.name }} - 상세 정보</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { margin: 0; font-family: 'Malgun Gothic', sans-serif; background: #f4f4f4; color: #333; }
+
+        /* 메인 페이지와 동일한 헤더 호버 애니메이션 */
+        header { 
+            background: #333; 
+            padding: 25px 0; 
+            text-align: center; 
+            min-width: 1200px; 
+            transition: background 0.3s ease;
+        }
+        header:hover { background: #222; }
+
+        .logo-link { 
+            color: white; 
+            text-decoration: none; 
+            font-size: 28px; 
+            font-weight: bold; 
+            display: inline-block;
+            position: relative;
+            transition: all 0.3s ease;
+            letter-spacing: 1px;
+        }
+        .logo-link:hover { color: #ffca28; transform: scale(1.05); }
+        .logo-link::after {
+            content: ""; position: absolute; bottom: -8px; left: 50%; width: 0; height: 3px;
+            background: #ffca28; transition: all 0.3s ease; transform: translateX(-50%);
+        }
+        .logo-link:hover::after { width: 100%; }
+
+        .container { display: flex; min-height: 100vh; min-width: 1200px; }
+        
+        /* 사이드바 */
+        .sidebar-left { width: 220px; flex-shrink: 0; background: #ddd; padding: 20px; border-right: 1px solid #bbb; }
+        .side-box { background: white; padding: 15px; margin-bottom: 20px; border-radius: 4px; border: 1px solid #ccc; }
+        
+        /* 본문 영역 - 버튼이 빠진 만큼 상단 여백을 조정했습니다 */
+        .main-content { flex: 1; padding: 50px 40px; background: white; }
+
+        /* 아이템 상단 요약 */
+        .detail-header { display: flex; gap: 35px; margin-bottom: 35px; border-bottom: 1px solid #eee; padding-bottom: 35px; }
+        .detail-img { width: 150px; height: 150px; object-fit: contain; border: 1px solid #ddd; background: #fff; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .detail-info h1 { margin: 0 0 15px 0; font-size: 34px; color: #111; }
+        .detail-desc { line-height: 1.8; color: #555; font-size: 15px; background: #f9f9f9; padding: 20px; border-radius: 6px; border-left: 5px solid #ffca28; }
+
+        /* 차트 영역 */
+        .chart-section { background: #fff; padding: 25px; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 40px; box-shadow: 0 3px 10px rgba(0,0,0,0.03); }
+        .chart-title { font-size: 19px; font-weight: bold; margin-bottom: 20px; color: #333; }
+        .chart-container { position: relative; height: 380px; width: 100%; }
+
+        /* 하단 탭 */
+        .tab-menu { display: flex; gap: 5px; margin-bottom: -1px; }
+        .tab-btn { padding: 14px 40px; border: 1px solid #ccc; background: #f0f0f0; cursor: pointer; border-radius: 8px 8px 0 0; font-weight: bold; font-size: 15px; transition: 0.2s; }
+        .tab-btn.active { background: white; border-bottom: 1px solid white; color: #d32f2f; }
+        .tab-content { border: 1px solid #ccc; padding: 30px; border-radius: 0 8px 8px 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
+
+        /* 테이블 스타일 */
+        .item-table { width: 100%; border-collapse: collapse; }
+        .item-table th { background: #f8f9fa; border-bottom: 2px solid #333; padding: 15px; font-size: 14px; color: #444; }
+        .item-table td { border-bottom: 1px solid #eee; padding: 15px; text-align: center; font-size: 14px; }
+        .text-right { text-align: right !important; padding-right: 40px !important; }
+        .price-highlight { color: #d32f2f; font-weight: bold; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <header><a href="/" class="logo-link">Mabinogi Auction System</a></header>
+
+    <div class="container">
+        <aside class="sidebar-left">
+            <div class="side-box">
+                <strong>아이템 검색</strong>
+                <form action="/" method="get">
+                    <input type="text" name="search" placeholder="아이템 이름 입력" style="width: 100%; margin-top: 10px; padding: 6px; box-sizing: border-box;">
+                    <button type="submit" style="width: 100%; margin-top: 10px; padding: 7px; background: #333; color: white; border: none; cursor: pointer; border-radius: 3px;">검색</button>
+                </form>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="detail-header">
+                <img src="{% static item.thumb %}" class="detail-img" onerror="this.src='{% static 'images/mabi_logo.jpg' %}';">
+                <div class="detail-info">
+                    <h1>{{ item.name }}</h1>
+                    <div class="detail-desc">{{ item.desc|linebreaksbr }}</div>
+                </div>
+            </div>
+
+            <div class="chart-section">
+                <div class="chart-title">📈 시간별 가격 변동 추이 (개당 금액)</div>
+                <div class="chart-container">
+                    <canvas id="priceTimeChart"></canvas>
+                </div>
+            </div>
+
+            <div class="tab-menu">
+                <button class="tab-btn active" onclick="switchTab('sale')">실시간 매물</button>
+                <button class="tab-btn" onclick="switchTab('history')">체결 시세</button>
+            </div>
+
+            <div id="tab-sale" class="tab-content">
+                <table class="item-table">
+                    <thead>
+                        <tr>
+                            <th>수량</th>
+                            <th>개당 금액</th>
+                            <th>총 금액</th>
+                            <th>남은 시간</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for l in listings %}
+                        <tr>
+                            <td>{{ l.count }}</td>
+                            <td class="text-right price-highlight">{{ l.unit_price }} G</td>
+                            <td class="text-right" style="font-weight: bold;">{{ l.total_price }} G</td>
+                            <td style="color:#777;">{{ l.display_time }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" style="padding: 50px; color: #999;">현재 경매장에 매물이 없습니다.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="tab-history" class="tab-content hidden">
+                <div style="text-align: center; color: #888; padding: 60px;">
+                    <p>거래 완료 내역 데이터를 불러오는 중입니다...</p>
+                    <small>(현재는 실시간 매물 데이터 기반 차트만 제공됩니다)</small>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function switchTab(type) {
+            document.getElementById('tab-sale').classList.add('hidden');
+            document.getElementById('tab-history').classList.add('hidden');
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-' + type).classList.remove('hidden');
+            event.currentTarget.classList.add('active');
+        }
+
+        const ctx = document.getElementById('priceTimeChart').getContext('2d');
+        const labels = [{% for l in listings %}"{{ l.display_time }}",{% endfor %}];
+        const prices = [{% for l in listings %}{{ l.raw_price }},{% endfor %}];
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Gold',
+                    data: prices,
+                    borderColor: '#d32f2f',
+                    backgroundColor: 'rgba(211, 47, 47, 0.05)',
+                    borderWidth: 3,
+                    tension: 0.3,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#fff',
+                    pointBorderWidth: 2,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            label: function(tooltipItem) {
+                                return '가격: ' + tooltipItem.raw.toLocaleString() + ' G';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: { display: true, text: '등록 시간 경향 (남은 시간 기준)', color: '#999' },
+                        grid: { display: false }
+                    },
+                    y: {
+                        beginAtZero: false,
+                        title: { display: true, text: '개당 가격 (Gold)', color: '#999' },
+                        ticks: {
+                            callback: function(value) {
+                                return value.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

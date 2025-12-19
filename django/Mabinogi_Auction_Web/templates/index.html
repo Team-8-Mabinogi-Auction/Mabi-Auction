@@ -1,0 +1,270 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Mabinogi Auction System</title>
+    <style>
+        /* 기본 레이아웃 및 폰트 */
+        body { margin: 0; font-family: 'Malgun Gothic', sans-serif; background: #f4f4f4; color: #333; }
+
+        header { 
+            background: #333; padding: 25px 0; text-align: center; min-width: 1200px; transition: background 0.3s ease;
+        }
+        header:hover { background: #222; }
+
+        .logo-link { 
+            color: white; text-decoration: none; font-size: 28px; font-weight: bold; display: inline-block;
+            position: relative; transition: all 0.3s ease; letter-spacing: 1px;
+        }
+        .logo-link:hover { color: #ffca28; transform: scale(1.05); }
+        .logo-link::after {
+            content: ""; position: absolute; bottom: -8px; left: 50%; width: 0; height: 3px;
+            background: #ffca28; transition: all 0.3s ease; transform: translateX(-50%);
+        }
+        .logo-link:hover::after { width: 100%; }
+
+        .container { display: flex; min-height: 100vh; min-width: 1200px; }
+        
+        /* 사이드바 및 메인 영역 */
+        .sidebar-left { width: 220px; flex-shrink: 0; background: #ddd; padding: 20px; border-right: 1px solid #bbb; }
+        .main-content { flex: 1; padding: 30px; background: white; min-width: 750px; }
+        .sidebar-right { width: 280px; flex-shrink: 0; background: #f9f9f9; padding: 20px; border-left: 1px solid #bbb; }
+        .side-box { background: white; padding: 15px; margin-bottom: 20px; border-radius: 4px; border: 1px solid #ccc; }
+        
+        /* 메인 테이블 스타일 */
+        .item-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 20px; }
+        .item-table th { background: #e0e0e0; border-bottom: 2px solid #333; padding: 12px 5px; font-size: 14px; cursor: pointer; position: relative; }
+        .item-table th.sorted { background-color: #a0a0a0 !important; color: #fff !important; } 
+        .item-table td.sorted-col { background-color: #d8d8d8 !important; font-weight: 500; }
+        .item-table tr:hover td { background-color: #e2efff !important; }
+        .item-table th::after { content: ""; position: absolute; right: 8px; font-size: 11px; color: #888; }
+        .item-table th.asc::after { content: "▲"; color: #ff3b3b !important; font-weight: bold; } 
+        .item-table th.desc::after { content: "▼"; color: #2196f3 !important; font-weight: bold; }
+        .item-table td { border-bottom: 1px solid #ccc; padding: 10px 5px; text-align: center; font-size: 13px; height: 50px; color: #222; }
+        
+        /* 페이지네이션 */
+        .pagination { display: flex; justify-content: center; align-items: center; margin-top: 20px; gap: 5px; }
+        .page-btn { padding: 6px 12px; border: 1px solid #bbb; background: white; cursor: pointer; border-radius: 4px; font-size: 12px; }
+        .page-btn.active { background: #333; color: white; border-color: #333; }
+        .btn-more { background: #ff5722 !important; color: white !important; font-weight: bold; border: none; }
+        
+        /* 유틸리티 클래스 */
+        .col-img { width: 60px; } .col-name { width: 35%; text-align: left; } .col-count { width: 80px; } 
+        .col-unit { width: 140px; } .col-total { width: 160px; } .col-time { width: 120px; }
+        .text-right { text-align: right !important; padding-right: 15px !important; }
+        .thumb { width: 40px; height: 40px; object-fit: contain; border: 1px solid #ddd; background: #fff; border-radius: 4px; }
+        .item-name { color: #111; font-weight: bold; text-decoration: none; cursor:pointer; }
+        .item-name:hover { color: #d32f2f; text-decoration: underline; }
+
+        /* 사재기 탐지 섹션 스타일 */
+        .warning-item-box { padding: 12px 0; border-bottom: 1px solid #eee; }
+        .warning-item-box:last-child { border-bottom: none; }
+        .warning-label { font-size: 11px; font-weight: bold; padding: 2px 5px; border-radius: 3px; }
+        .label-경고 { background: #ffebee; color: #d32f2f; }
+        .label-의심 { background: #fff3e0; color: #ef6c00; }
+        .reason-tag { 
+            display: inline-block; margin-top: 8px; padding: 2px 8px; background: #f9f9f9; 
+            border: 1px solid #ddd; border-radius: 4px; font-size: 11px; cursor: help; color: #444; 
+        }
+    </style>
+</head>
+<body>
+    <header><a href="/" class="logo-link">Mabinogi Auction System</a></header>
+    
+    <div class="container">
+        <aside class="sidebar-left">
+            <div class="side-box">
+                <strong>아이템 검색</strong>
+                <form action="" method="get">
+                    <input type="text" name="search" placeholder="아이템 이름 입력" value="{{ search_query }}" style="width:100%; margin-top:10px; padding:6px; box-sizing:border-box;">
+                    <button type="submit" style="width:100%; margin-top:10px; padding:7px; background:#333; color:white; border:none; border-radius:3px; cursor:pointer;">검색</button>
+                </form>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <h3 style="margin-top: 0;">아이템 경매장 리스트</h3>
+            <table class="item-table" id="itemTable">
+                <thead>
+                    <tr>
+                        <th class="col-img">이미지</th>
+                        <th class="col-name" onclick="sortTable(1, 'str', this)">아이템 이름</th>
+                        <th class="col-count" onclick="sortTable(2, 'num', this)">수량</th>
+                        <th class="col-unit" onclick="sortTable(3, 'num', this)">개당 금액</th>
+                        <th class="col-total" onclick="sortTable(4, 'num', this)">총 금액</th>
+                        <th class="col-time" onclick="sortTable(5, 'num', this)">남은 시간</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    {% for item in items %}
+                    <tr>
+                        <td><img src="{% static item.display_img %}" class="thumb" onerror="this.src='{% static 'images/mabi_logo.jpg' %}';"></td>
+                        <td style="text-align: left;"><a href="/item/{{ item.name|urlencode }}/" class="item-name">{{ item.name }}</a></td>
+                        <td>{{ item.count }}</td>
+                        <td class="text-right" data-value="{{ item.unit_price|cut:',' }}">{{ item.unit_price }}</td>
+                        <td class="text-right" data-value="{{ item.total_price|cut:',' }}" style="font-weight: bold;">{{ item.total_price }}</td>
+                        <td data-value="{{ item.sort_val }}">{{ item.display_time }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div id="pagination" class="pagination"></div>
+        </main>
+
+        <aside class="sidebar-right">
+            <h3>상태 정보</h3>
+            <div id="statusBox" class="side-box"></div>
+        
+            <div class="side-box" style="padding: 0; overflow: hidden; border-top: none;">
+                <div style="height: 4px; background-color: #d32f2f; width: 100%;"></div>
+                
+                <div style="padding: 15px;">
+                    <strong style="color: #d32f2f; display: block; margin-bottom: 12px; font-size: 15px;">⚠️ 사재기 경고 아이템</strong>
+                    <div id="warningList">
+                        {% for warn in warning_items %}
+                        <div class="warning-item-box">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                <div style="max-width: 160px;">
+                                    <div style="font-size: 13px; font-weight: bold; color: #111;">{{ warn.name }}</div>
+                                    <div style="font-size: 11px; color: #888; margin-top: 3px;">
+                                        ID: {{ warn.id }} | {{ warn.price }} G
+                                    </div>
+                                </div>
+                                <span class="warning-label label-{{ warn.level }}">{{ warn.level }}</span>
+                            </div>
+                            <div class="reason-tag" title="{{ warn.reason_detail }}">
+                                <strong>{{ warn.reason_code }}</strong>. {{ warn.reason_label }}
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div style="text-align: center; padding: 20px; color: #999; font-size: 12px;">감지된 이상 내역이 없습니다.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        let currentPage = 1;
+        const rowsPerPage = 10;
+        let allRows = [];
+        let offset = 100; 
+        let serverHasMore = {{ has_more|yesno:"true,false" }};
+        let currentSortIdx = -1; 
+
+        window.onload = () => refreshRowList();
+
+        function refreshRowList() {
+            allRows = Array.from(document.getElementById("tableBody").rows);
+            updateStatus();
+            displayPage(currentPage);
+        }
+
+        function updateStatus() {
+            const totalPages = Math.ceil(allRows.length / rowsPerPage);
+            document.getElementById("statusBox").innerHTML = `
+                <strong>현재 로드 상태</strong>
+                <div style="font-size:12px; color:#666; margin-top:5px;">데이터: ${allRows.length}개</div>
+                <div style="font-size:12px; color:#666;">페이지: ${currentPage} / ${totalPages}</div>
+            `;
+        }
+
+        function displayPage(page) {
+            currentPage = page;
+            const start = (page - 1) * rowsPerPage;
+            const end = start + rowsPerPage;
+            
+            allRows.forEach((row, index) => {
+                row.style.display = (index >= start && index < end) ? "" : "none";
+                Array.from(row.cells).forEach((cell, cellIdx) => {
+                    if (cellIdx === currentSortIdx) cell.classList.add("sorted-col");
+                    else cell.classList.remove("sorted-col");
+                });
+            });
+            renderPagination();
+            updateStatus();
+        }
+
+        function renderPagination() {
+            const paginationContainer = document.getElementById("pagination");
+            paginationContainer.innerHTML = "";
+            const totalPages = Math.ceil(allRows.length / rowsPerPage);
+            if (allRows.length === 0) return;
+
+            const createBtn = (text, onClick, disabled = false, className = "page-btn") => {
+                const btn = document.createElement("button");
+                btn.innerHTML = text; btn.className = className;
+                btn.disabled = disabled; btn.onclick = onClick;
+                return btn;
+            };
+
+            paginationContainer.appendChild(createBtn("« 처음", () => displayPage(1), currentPage === 1));
+            paginationContainer.appendChild(createBtn("◀", () => displayPage(currentPage - 1), currentPage === 1));
+
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(totalPages, startPage + 4);
+            if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+
+            for (let i = startPage; i <= endPage; i++) {
+                if(i >= 1 && i <= totalPages) {
+                    paginationContainer.appendChild(createBtn(i, () => displayPage(i), false, i === currentPage ? "page-btn active" : "page-btn"));
+                }
+            }
+
+            paginationContainer.appendChild(createBtn("▶", () => displayPage(currentPage + 1), currentPage === totalPages));
+
+            if (currentPage === totalPages && serverHasMore) {
+                paginationContainer.appendChild(createBtn("데이터 더 가져오기 ↓", loadMoreData, false, "page-btn btn-more"));
+            } else {
+                paginationContainer.appendChild(createBtn(`끝(${totalPages}) »`, () => displayPage(totalPages), currentPage === totalPages));
+            }
+        }
+
+        function loadMoreData() {
+            fetch(`?search={{ search_query }}&offset=${offset}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(res => res.json())
+            .then(data => {
+                const tbody = document.getElementById("tableBody");
+                data.items.forEach(item => {
+                    const row = tbody.insertRow();
+                    row.innerHTML = `
+                        <td><img src="/static/${item.display_img}" class="thumb" onerror="this.src='/static/images/mabi_logo.jpg';"></td>
+                        <td style="text-align: left;"><a href="/item/${encodeURIComponent(item.name)}/" class="item-name">${item.name}</a></td>
+                        <td>${item.count}</td>
+                        <td class="text-right" data-value="${item.unit_price.replace(/,/g, '')}">${item.unit_price}</td>
+                        <td class="text-right" data-value="${item.total_price.replace(/,/g, '')}" style="font-weight: bold;">${item.total_price}</td>
+                        <td data-value="${item.sort_val}">${item.display_time}</td>
+                    `;
+                });
+                offset += data.items.length;
+                serverHasMore = data.has_more;
+                refreshRowList();
+            });
+        }
+
+        function sortTable(n, type, headerEl) {
+            let dir = headerEl.getAttribute("data-dir") === "asc" ? "desc" : "asc";
+            currentSortIdx = n;
+            document.querySelectorAll("th").forEach(th => {
+                th.removeAttribute("data-dir"); th.classList.remove("sorted", "asc", "desc");
+            });
+            headerEl.setAttribute("data-dir", dir);
+            headerEl.classList.add("sorted", dir);
+
+            allRows.sort((a, b) => {
+                let x = a.cells[n].getAttribute("data-value") || a.cells[n].innerText.trim();
+                let y = b.cells[n].getAttribute("data-value") || b.cells[n].innerText.trim();
+                if (type === 'num') return dir === "asc" ? parseFloat(x) - parseFloat(y) : parseFloat(y) - parseFloat(x);
+                return dir === "asc" ? x.localeCompare(y, 'ko') : y.localeCompare(x, 'ko');
+            });
+            const tbody = document.getElementById("tableBody");
+            tbody.append(...allRows);
+            displayPage(1);
+        }
+    </script>
+</body>
+</html>

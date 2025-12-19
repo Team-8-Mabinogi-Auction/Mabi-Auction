@@ -12,7 +12,7 @@ from kafka_auction.config.settings import (
     LOG_LEVEL,
 )
 from kafka_auction.collector.kafka_producer import send_message, producer
-from kafka_auction.processor.utils import generate_match_signature, generate_full_signature
+from kafka_auction.processor.utils import generate_match_signature
 
 logging.basicConfig(level=LOG_LEVEL)
 logger = logging.getLogger(__name__)
@@ -49,12 +49,8 @@ def fetch_history_page(
 def run_history_cycle() -> None:
     """
     '한 번의 호출 주기'에 해당하는 전체 수집 사이클.
-
-    - cursor = "" 부터 시작해서 next_cursor가 없어질 때까지 반복
-    - 각 페이지(최대 500개)를 받아서 바로 Kafka로 전송
-    - 이 사이클 전체를 식별하는 cycle_id(타임스탬프 문자열)를 부여 
     """
-    # 주기 시작 시각 (사이클 ID 및 Kafka timestamp 기준) 
+    # 주기 시작 시각
     cycle_started_at_dt = datetime.now(timezone.utc)
     cycle_started_at = cycle_started_at_dt.isoformat()
 
@@ -71,7 +67,6 @@ def run_history_cycle() -> None:
     cursor_cnt = 0
     items_cnt = 0
 
-
     while True:
         logger.info("Fetching history: page_number= '%d'(cursor='%s')", cursor_cnt, cursor)
 
@@ -80,13 +75,7 @@ def run_history_cycle() -> None:
         except Exception:
             logger.exception("Error while fetching listings: page_number= '%d'(cursor='%s')", cursor_cnt, cursor)
             break
-
         
-        # 집계 정보 업데이트 및 로깅 코드 수정
-        current_count = len(items)
-        total_items += current_count
-        page_index += 1
-
         logger.info(
             "Received %d items: page_number= '%d'(cursor='%s')",
             len(items),
@@ -102,21 +91,18 @@ def run_history_cycle() -> None:
             match_signature = generate_match_signature(item)
             item["match_signature"] = match_signature
 
-
             event = {
                 "type": "HISTORY",
-                "cycle_id": cycle_started_at,   # 이 호출 주기 식별자 (나중에 S3에서 묶어보기 좋음)
+                "cycle_id": cycle_started_at,   # 이 호출 주기 식별자
                 "match_id" : match_signature,   # 고유 아이템 해시와 혼동 우려로 변경
                 "raw": item,
             }
-
             
             send_message(
                 topic=TOPIC_HISTORY,
                 key=match_signature,
                 value=event,
             )
-
 
         if not next_cursor or not items:
             logger.info("No next_cursor or no items. Ending cycle.")
@@ -127,11 +113,11 @@ def run_history_cycle() -> None:
     # 사이클 종료 컨트롤 메시지
     end_event = {
         "type": "END_OF_CYCLE",
+        "cycle_id": cycle_started_at,
     }
 
     send_message(
         topic=TOPIC_HISTORY,
-        #key=,
         value=end_event,
         flush=True,  # 마지막에는 flush
     )

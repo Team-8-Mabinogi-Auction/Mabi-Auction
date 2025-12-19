@@ -49,12 +49,8 @@ def fetch_listings_page(
 def run_listings_cycle() -> None:
     """
     '한 번의 호출 주기'에 해당하는 전체 수집 사이클.
-
-    - cursor = "" 부터 시작해서 next_cursor가 없어질 때까지 반복
-    - 각 페이지(최대 500개)를 받아서 바로 Kafka로 전송
-    - 이 사이클 전체를 식별하는 cycle_id(타임스탬프 문자열)를 부여 -> 추후 dag 호출 시간으로 변경
     """
-    # 주기 시작 시각 (사이클 ID 및 Kafka timestamp 기준) -> 추후  dag 호출 시간으로 변경
+    # 주기 시작 시각
     cycle_started_at_dt = datetime.now(timezone.utc)
     cycle_started_at = cycle_started_at_dt.isoformat()
 
@@ -80,11 +76,7 @@ def run_listings_cycle() -> None:
             logger.exception("Error while fetching listings: page_number= '%d'(cursor='%s')", cursor_cnt, cursor)
             break
 
-        
-        # 집계 정보 업데이트 및 로깅 인자 수정
-        current_count = len(items)
-        total_items += current_count
-        page_index += 1
+        # [수정됨] 에러를 유발하던 불필요한 변수 연산(total_items, page_index) 삭제함
         
         logger.info(
             "Received %d items: page_number= '%d'(cursor='%s')",
@@ -97,28 +89,25 @@ def run_listings_cycle() -> None:
         cursor_cnt += 1
 
         for item in items:
-            # 매칭용 해시 - 매칭 해시 추가(수정)
+            # 매칭용 해시 생성
             full_signature = generate_full_signature(item)
             match_signature = generate_match_signature(item)
             item["full_signature"] = full_signature
             item["match_signature"] = match_signature
 
-
             event = {
                 "type": "LISTING",
-                "cycle_id": cycle_started_at,   # 이 호출 주기 식별자 (나중에 S3에서 묶어보기 좋음)
+                "cycle_id": cycle_started_at,
                 "item_id" : full_signature,
                 "match_id": match_signature,
                 "raw": item,
             }
-
             
             send_message(
                 topic=TOPIC_LISTINGS_EQUIPMENTS,
                 key=full_signature,
                 value=event,
             )
-
 
         if not next_cursor or not items:
             logger.info("No next_cursor or no items. Ending cycle.")
@@ -129,13 +118,13 @@ def run_listings_cycle() -> None:
     # 사이클 종료 컨트롤 메시지
     end_event = {
         "type": "END_OF_CYCLE",
+        "cycle_id": cycle_started_at,
     }
 
     send_message(
         topic=TOPIC_LISTINGS_EQUIPMENTS,
-        #key=,
         value=end_event,
-        flush=True,  # 마지막에는 flush
+        flush=True,
     )
 
     # 사이클 종료 시각 및 경과 시간 계산

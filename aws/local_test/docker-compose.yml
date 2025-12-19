@@ -1,0 +1,101 @@
+version: '3.8'
+
+networks:
+  mabi-net:
+    driver: bridge
+
+services:
+  # EC2-1 : Kafka
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: ec2-1-kafka
+    hostname: kafka
+    ports:
+      - "9092:9092"
+      - "9094:9094" # 로컬 접속용 포트 추가
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      # 9094 포트를 추가로 리스닝하도록 설정
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:9094
+      # 핵심: 내부용은 kafka:9092, 외부(로컬)용은 localhost:9094라고 알려줌
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - mabi-net
+
+  # EC2-3 대용 : PostgreSQL (Airflow MetaDB + Auction Log 데이터 저장소)
+  postgres:
+    image: postgres:13
+    container_name: ec2-postgres
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    ports:
+      - "5432:5432"
+    networks:
+      - mabi-net
+
+  # EC2-2 : Airflow Webserver
+  airflow-main:
+    image: apache/airflow:2.9.3
+    container_name: ec2-airflow-web
+    user: "0:0"
+    depends_on:
+      - kafka
+      - postgres
+    ports:
+      - "8080:8080"
+    environment:
+      # SQLite 대신 Postgres 연결 (실제 EC2 환경과 동일하게 설정)
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor # Postgres를 쓰면 Sequential 대신 LocalExecutor 사용 가능 (병렬 처리 가능)
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+    entrypoint: ["/bin/bash", "-c"]
+    command: >
+      "airflow db migrate &&
+      airflow users create --username admin --password admin --firstname admin --lastname admin --role Admin --email admin@example.com &&
+      airflow webserver"
+    networks:
+      - mabi-net
+
+  # EC2-2-2 : Airflow Scheduler
+  airflow-scheduler:
+    image: apache/airflow:2.9.3
+    container_name: ec2-airflow-scheduler
+    user: "0:0"
+    depends_on:
+      - airflow-main
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+    command: scheduler
+    networks:
+      - mabi-net
+
+  # EC2-3 역할 : Django Web Server
+  django:
+    build: 
+      context: ../../django  
+      dockerfile: Dockerfile
+    container_name: ec2-django
+    depends_on:
+      - postgres
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../../django:/app  # 로컬의 django 폴더를 컨테이너의 /app으로 연결
+    networks:
+      - mabi-net

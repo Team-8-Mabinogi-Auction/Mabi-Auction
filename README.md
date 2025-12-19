@@ -35,8 +35,7 @@ Visualization: Chart.js
 Data Source: CSV, JSON (Current) → DB Migration Planned
 
 📂 프로젝트 구조 (Project Structure)
-Plaintext
-
+```Plaintext
 ├── Mabi_Auction_app/      # 핵심 로직 (Views, URLs)
 ├── static/                # 정적 파일 관리
 │   ├── test_data/         # CSV/JSON 데이터 (DB 전환 대상)
@@ -44,6 +43,7 @@ Plaintext
 │   └── js/                # 정렬 및 페이징 로직
 ├── templates/             # index, detail 화면 구성
 └── manage.py              # 실행 스크립트
+```
 ⚙️ 실행 방법 (Setup)
 1. 레포지토리 클론
 

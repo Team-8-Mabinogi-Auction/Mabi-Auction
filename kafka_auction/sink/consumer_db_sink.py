@@ -175,7 +175,7 @@ class AuctionDbSink:
                 sold_price = history.get('auction_price_per_unit')
                 sold_time = self.parse_time(history.get('date_auction_buy'))
                 
-                # [수정] 판매 시점의 옵션 정보 저장
+                # 판매 시점의 옵션 정보 저장
                 current_opts = target_data.get('options') if db_item else target_data.get('item_option', [])
                 
                 # Log Insert

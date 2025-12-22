@@ -1,5 +1,5 @@
 import redis
-import time
+import json
 
 # Redis 접속 정보 및 윈도우 설정
 REDIS_CONFIG = {
@@ -26,6 +26,7 @@ class WindowBuffer:
         self.r = redis.StrictRedis(**REDIS_CONFIG)
         self.SOLD_WINDOW_SEC = WINDOW_SETTINGS['SOLD_SEC']
         self.REG_WINDOW_SEC = WINDOW_SETTINGS['REG_SEC']
+        self.REGISTER_GRACE_SEC = WINDOW_SETTINGS['REGISTER_GRACE_SEC']
 
         # 판매 이벤트 추가 + 실시간 평균가 계산
         # 데이터 추가 -> 만료 삭제 -> 현재 윈도우 내 평균가 및 판매량 리턴
@@ -169,6 +170,28 @@ class WindowBuffer:
         """
         key = f"alert:cooldown:{item_name}:{alert_type}"
         return self.r.set(key, "1", ex=duration_sec, nx=True)
+    
+    def save_alert_to_redis(self, payload):
+        """
+        메인 페이지용 캐시 저장 (views.py가 읽어갈 데이터)
+        """
+        alert_key = "view:recent_alerts" 
+        ttl_seconds = 6 * 60 * 60  # 6시간 = 21600초
+        
+        try:
+            # 1. JSON 변환
+            payload_json = json.dumps(payload, ensure_ascii=False)
+            
+            pipe = self.r.pipeline()
+            
+            pipe.lpush(alert_key, payload_json)         # 데이터 넣기
+            pipe.ltrim(alert_key, 0, 9)                 # 10개만 남기고 자르기
+            pipe.expire(alert_key, ttl_seconds)         # [추가됨] 수명을 6시간으로 초기화
+            
+            pipe.execute() # 실행
+            
+        except Exception as e:
+            print(f"Redis Cache Error: {e}")
 
     def add_alert_caution(self, item_name):
         self.r.sadd("alert:caution", item_name)

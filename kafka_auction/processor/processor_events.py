@@ -77,6 +77,10 @@ def emit_event(event_type, item_id, match_id=None, listing_data=None, history_da
     
     elif history_data:
         event_time = history_data.get('date_auction_buy')
+
+    if event_time is None:
+        skip_anomaly = True
+
     event = {
         'event_type': event_type,
         'item_id': item_id,       # Unique Signature
@@ -285,7 +289,7 @@ def process_listing_message(data):
             recent_info = {
                 'item_id': item_id,
                 'item_name': raw_item.get('item_name'),
-                'item_category': raw_item.get('item_category'),
+                'item_category': raw_item.get('auction_item_category'),
                 'price_per_unit': raw_item.get('auction_price_per_unit'),
                 'item_count': raw_item.get('item_count'),
                 'total_price': raw_item.get('auction_price_per_unit') * raw_item.get('item_count'),

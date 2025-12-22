@@ -22,10 +22,10 @@ DB_CONFIG = {
 }
 
 DETECTOR_CONFIG = {
-    'SWEEPING_RATIO': 0.0001,      # 매점 판단 비율
-    'MANIPULATION_RATIO': 0.01,    # 매석 판단 비율
+    'SWEEPING_RATIO': 0.1,      # 매점 판단 비율
+    'MANIPULATION_RATIO': 0.1,    # 매석 판단 비율
     'HIGH_PRICE_MULTIPLIER': 1.2,  # 고가 판단 기준
-    'ALERT_COOLDOWN_SEC': 10       # 알림 재발송 쿨타임
+    'ALERT_COOLDOWN_SEC': 60       # 알림 재발송 쿨타임
 }
 
 logging.basicConfig(
@@ -78,29 +78,32 @@ class DBHandler:
             logger.warning("[DB] Connection lost. Reconnecting...")
             self.connect()
 
-    def fetch_market_count(self, item_name):
-        """초기 매물 수량 조회"""
+    def fetch_all_market_counts(self):
+        """프로그램 시작 시 모든 아이템의 현재 재고를 한 번에 조회 (RDS 비용 최적화)"""
         self.check_connection()
-        if not self.conn: return 0
+        if not self.conn: return {}
 
-        count = 0
+        item_counts = {}
         try:
             with self.conn.cursor() as cur:
+                # 개별 조회가 아닌 GROUP BY를 통해 전체 스냅샷 로드
                 sql = """
-                    SELECT COALESCE(SUM(item_count), 0) 
+                    SELECT item_name, SUM(item_count) 
                     FROM mabi_auction.current_listings 
-                    WHERE item_name = %s OR item_display_name = %s
+                    GROUP BY item_name
                 """
-                cur.execute(sql, (item_name, item_name))
-                result = cur.fetchone()
-                if result:
-                    count = int(result[0])
+                cur.execute(sql)
+                rows = cur.fetchall()
+                for name, count in rows:
+                    if name:
+                        item_counts[name] = int(count)
             self.conn.commit()
+            logger.info(f"[Init] Bulk loaded {len(item_counts)} items from DB.")
         except Exception as e:
-            logger.error(f"[DB Error] Fetch count failed: {e}", exc_info=True)
+            logger.error(f"[DB Error] Bulk fetch failed: {e}", exc_info=True)
             self.conn.rollback()
         
-        return count
+        return item_counts
 
     def save_log(self, log_data):
         """이상 탐지 로그 저장"""
@@ -109,15 +112,17 @@ class DBHandler:
 
         try:
             with self.conn.cursor() as cur:
+                # [수정] SyntaxError 해결: 컬럼 개수와 VALUES 개수를 6개로 일치시킴
                 sql = """
                     INSERT INTO mabi_auction.anomaly_logs 
-                    (detection_time, item_name, anomaly_type, description, id)
-                    VALUES (%s, %s, %s, %s, %s)
+                    (detection_time, event_time, item_name, anomaly_type, description, id)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                 """
                 description_json = json.dumps(log_data.get('details', {}), ensure_ascii=False)
                 
                 cur.execute(sql, (
                     log_data['timestamp'],
+                    log_data.get('event_time'), # event_time 추가
                     log_data['item_name'],
                     log_data['type'],
                     description_json,
@@ -135,8 +140,8 @@ class DBHandler:
 
 # 초기화
 wb = WindowBuffer()
-db_handler = DBHandler(DB_CONFIG) # DB 핸들러 생성
-initialized_items = set()
+db_handler = DBHandler(DB_CONFIG)
+# initialized_items = set()  <-- 전체 로딩 방식을 쓰므로 더 이상 필요 없음
 
 producer = KafkaProducer(
     bootstrap_servers=KAFKA_BROKER,
@@ -150,6 +155,11 @@ consumer = KafkaConsumer(
     auto_offset_reset='latest',
     group_id='anomaly-detection-group'
 )
+
+# [핵심 수정] 루프 시작 전 전체 매물 수 동기화 (최초 1회 DB 조회)
+initial_counts = db_handler.fetch_all_market_counts()
+for name, count in initial_counts.items():
+    wb.update_market_count(name, count)
 
 logger.info(f"Anomaly Detector Started... Listening on {TOPIC_EVENTS}")
 
@@ -190,20 +200,8 @@ try:
             if not unique_id:
                 unique_id = event.get('match_id')
 
-        # 3. 현재 매물 수 동기화 (최초 1회 DB 조회)
-        if item_name not in initialized_items:
-            current_wb_count = wb.get_current_total_count(item_name)
-            
-            if current_wb_count == 0:
-                # 핸들러를 통해 DB 조회
-                db_count = db_handler.fetch_market_count(item_name)
-                if db_count > 0:
-                    logger.info(f"[Init] '{item_name}' initialized from DB: {db_count} items")
-                    wb.update_market_count(item_name, db_count)
-            
-            initialized_items.add(item_name)
-
         # 4. 실시간 매물 수 업데이트
+        # 루프 밖에서 초기화가 끝났으므로, 이제부터는 Kafka 이벤트로만 증감 관리
         if event_type == 'REGISTER':
             wb.update_market_count(item_name, 1)
         elif event_type in ['SOLD', 'EXPIRE', 'CANCEL']:
@@ -217,7 +215,10 @@ try:
         # [매점 감지] Trigger: SOLD
         if event_type == 'SOLD':
             sold_velocity, avg_sold_price = wb.add_sold_event_atomic(item_name, unique_id, item_price, event_ts)
-            total_market_count = wb.get_current_total_count(item_name)
+            
+            # [방어 코드] 등록보다 판매가 먼저 올 경우를 대비해 최소 재고를 1로 설정하여 계산
+            current_count = wb.get_current_total_count(item_name)
+            total_market_count = max(current_count, 1) 
             
             if total_market_count > 0:
                 sweeping_ratio = sold_velocity / total_market_count
@@ -244,6 +245,7 @@ try:
                             "event_time": event_time_str
                         }
                         producer.send(TOPIC_ANOMALY, alert_payload)
+                        wb.save_alert_to_redis(alert_payload)
 
                         description_msg = f"[매점감지] 판매율:{sweeping_ratio:.1%} | 10분판매:{sold_velocity}개 | 재고:{total_market_count}개 | 평균가:{avg_sold_price:,.0f}"
 
@@ -295,6 +297,7 @@ try:
                                     "event_time": event_time_str
                                 }
                                 producer.send(TOPIC_ANOMALY, alert_payload)
+                                wb.save_alert_to_redis(alert_payload)
 
                                 description_msg = f"[시세조작] 고가비율:{high_ratio:.1%} | 등록가:{item_price:,.0f} | 평균가:{current_ref_price:,.0f} | 기준가:{threshold:,.0f}"
 

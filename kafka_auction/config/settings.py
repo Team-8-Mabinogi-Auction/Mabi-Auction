@@ -30,6 +30,7 @@ KAFKA_BOOTSTRAP_SERVERS = os.getenv(
 )
 
 TOPIC_LISTINGS_EQUIPMENTS = os.getenv("TOPIC_LISTINGS", "auction.raw.listings.equipments")
+TOPIC_LISTINGS_CONSUMABLE = os.getenv("TOPIC_LISTINGS_CONSUMABLE", "auction.raw.listings.consumables")
 TOPIC_HISTORY = os.getenv("TOPIC_HISTORY", "auction.raw.history")
 
 # ─────────────────────────────

@@ -3,6 +3,7 @@ CREATE SCHEMA IF NOT EXISTS mabi_analytics;
 CREATE TABLE IF NOT EXISTS mabi_analytics.item_display_hourly_stats (
   bucket_hour timestamptz NOT NULL,
   item_display_name varchar(100) NOT NULL,
+  item_category varchar(50) NOT NULL,
 
   reg_price_max bigint,
   reg_price_min bigint,

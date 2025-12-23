@@ -8,6 +8,7 @@ reg AS (
   SELECT
     date_trunc('hour', l.registered_at) AS bucket_hour,
     l.item_display_name,
+    max(l.item_category) AS item_category,
     max(l.price) AS reg_price_max,
     min(l.price) AS reg_price_min,
     avg(l.price)::numeric AS reg_price_avg,
@@ -24,6 +25,7 @@ sold AS (
   SELECT
     date_trunc('hour', l.ended_at) AS bucket_hour,
     l.item_display_name,
+    max(l.item_category) AS item_category,
     max(l.price) AS sold_price_max,
     min(l.price) AS sold_price_min,
     avg(l.price)::numeric AS sold_price_avg,
@@ -40,6 +42,7 @@ merged AS (
   SELECT
     COALESCE(reg.bucket_hour, sold.bucket_hour) AS bucket_hour,
     COALESCE(reg.item_display_name, sold.item_display_name) AS item_display_name,
+    COALESCE(reg.item_category, sold.item_category) AS item_category,
 
     reg.reg_price_max,
     reg.reg_price_min,
@@ -58,6 +61,7 @@ merged AS (
 INSERT INTO mabi_analytics.item_display_hourly_stats (
   bucket_hour,
   item_display_name,
+  item_category,
   reg_price_max,
   reg_price_min,
   reg_price_avg,
@@ -70,6 +74,7 @@ INSERT INTO mabi_analytics.item_display_hourly_stats (
 SELECT
   bucket_hour,
   item_display_name,
+  item_category,
   reg_price_max,
   reg_price_min,
   reg_price_avg,
@@ -80,6 +85,7 @@ SELECT
   sold_count
 FROM merged
 ON CONFLICT (bucket_hour, item_display_name) DO UPDATE SET
+  item_category  = EXCLUDED.item_category,
   reg_price_max   = EXCLUDED.reg_price_max,
   reg_price_min   = EXCLUDED.reg_price_min,
   reg_price_avg   = EXCLUDED.reg_price_avg,

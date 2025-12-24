@@ -165,14 +165,45 @@ function serverSort(column) {
 }
 
 // 페이지 로드 시 실행
-window.onload = function() {
-    // 브라우저의 탐색 유형을 확인
-    const navEntries = performance.getEntriesByType('navigation');
-    if (navEntries.length > 0 && navEntries[0].type === 'reload') {
-        // 현재 URL에 파라미터(?sort= 등)가 있는지 확인
-        if (window.location.search !== '') {
-            console.log("새로고침 감지: 초기 화면으로 이동합니다.");
-            window.location.href = window.location.pathname; // 파라미터 없이 주소만 호출 (예: /)
-        }
+// window.onload = function() {
+//     // 브라우저의 탐색 유형을 확인
+//     const navEntries = performance.getEntriesByType('navigation');
+//     if (navEntries.length > 0 && navEntries[0].type === 'reload') {
+//         // 현재 URL에 파라미터(?sort= 등)가 있는지 확인
+//         if (window.location.search !== '') {
+//             console.log("새로고침 감지: 초기 화면으로 이동합니다.");
+//             window.location.href = window.location.pathname; // 파라미터 없이 주소만 호출 (예: /)
+//         }
+//     }
+// };
+
+document.addEventListener("DOMContentLoaded", function() {
+    // 1. 현재 URL에서 '?category=값' 가져오기
+    const params = new URLSearchParams(window.location.search);
+    const currentCat = params.get('category');
+
+    // 2. 카테고리가 선택되어 있다면 실행
+    if (currentCat) {
+        // 사이드바의 모든 링크(a 태그)를 가져옴
+        const links = document.querySelectorAll('.sub-cat-list a');
+        
+        links.forEach(link => {
+            // 링크의 주소(href)에 현재 카테고리 값이 포함되어 있는지 확인
+            // decodeURIComponent는 한글 깨짐 방지용
+            const linkHref = decodeURIComponent(link.getAttribute('href'));
+            
+            if (linkHref.includes(`category=${currentCat}`)) {
+                
+                // (1) 해당 링크에 'active-category' 클래스 추가 (CSS에서 디자인 처리)
+                link.classList.add('active-category');
+
+                // (2) 해당 링크가 숨겨져 있다면 부모(details)를 찾아서 펼치기
+                const parentDetails = link.closest('details');
+                if (parentDetails) {
+                    parentDetails.setAttribute('open', 'true');
+                    
+                }
+            }
+        });
     }
-};
+});

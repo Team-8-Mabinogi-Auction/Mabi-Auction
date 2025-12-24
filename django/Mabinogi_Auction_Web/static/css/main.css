@@ -131,6 +131,14 @@ header {
   flex-direction: column;
   gap: 4px; /* 카테고리 그룹 간 간격 */
 }
+.active-category {
+    background-color: #e3f2fd; /* 연한 파란색 배경 */
+    color: #1976d2 !important; /* 진한 파란색 글씨 */
+    font-weight: bold;
+    border-radius: 4px;
+    display: block; /* 배경색이 꽉 차게 */
+    padding: 2px 8px; /* 약간의 여백 */
+}
 
 /* 전체 보기 링크 (단일) */
 .cat-link-all {
@@ -405,9 +413,10 @@ header {
 .section-header-row h2 {
   margin: 0; 
   font-size: var(--font-header);
-  width: 90px; 
+  width: fit-content;
   font-weight: 700;
   line-height: 1; /* 높이 오차 줄임 */
+  margin-right:5px;
 }
 
 /* 새로 추가된 안내 문구 스타일 */
@@ -418,7 +427,7 @@ header {
   letter-spacing: -0.2px;
 }
 
-.refresh-time { font-size: 13px; color: var(--text-secondary); }
+.refresh-time { font-size: 13px; color: var(--text-secondary); margin-right:5px;}
 
 .table-card { padding: 0; overflow: hidden; } /* 카드 내부 패딩 제거 (테이블 꽉 채움) */
 

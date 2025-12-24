@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Tuple
 import time
 
@@ -51,7 +51,8 @@ def run_listings_cycle() -> None:
     '한 번의 호출 주기'에 해당하는 전체 수집 사이클.
     """
     # 주기 시작 시각
-    cycle_started_at_dt = datetime.now(timezone.utc)
+    KST = timezone(timedelta(hours=9))
+    cycle_started_at_dt = datetime.now(KST)
     cycle_started_at = cycle_started_at_dt.isoformat()
 
     auction_item_category = "모자/가발"
@@ -132,7 +133,7 @@ def run_listings_cycle() -> None:
     )
 
     # 사이클 종료 시각 및 경과 시간 계산
-    cycle_ended_at_dt = datetime.now(timezone.utc)
+    cycle_ended_at_dt = datetime.now(KST)
     elapsed_time = cycle_ended_at_dt - cycle_started_at_dt
     elapsed_seconds = elapsed_time.total_seconds()
 

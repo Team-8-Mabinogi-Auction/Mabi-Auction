@@ -35,6 +35,7 @@ KEY_PREFIX_HISTORY_SEEN = 'history:seen:'
 
 KEY_HISTORY_GHOST_BUFFER = 'history:ghost_buffer'
 KEY_RECENT_ITEMS = 'recent:items'
+KEY_STATUS_LAST_UPDATE = 'status:last_cycle_time'
 
 # Time Constants
 PROCESSED_TTL = 600       
@@ -164,6 +165,19 @@ def process_listing_message(data):
     # [Cycle End] 처리 로직
     if data.get('type') == 'END_OF_CYCLE':
         logger.info("Cycle End Processing...")
+
+        # 웹 처리용 시간 저장
+        cycle_time = data.get('cycle_id')
+        
+        if cycle_time:
+            # Redis에 저장 (웹사이트 Views.py에서 이 키를 가져감)
+            redis_client.set(KEY_STATUS_LAST_UPDATE, cycle_time)
+            logger.info(f"Updated Web Status Time: {cycle_time}")
+        else:
+            # 혹시 timestamp가 없다면 현재 시간으로 대체 (KST)
+            now_kst = datetime.now(KST).isoformat()
+            redis_client.set(KEY_STATUS_LAST_UPDATE, now_kst)
+            logger.warning("No timestamp in END_OF_CYCLE. Used current time.")
         
         active_item_ids = set(redis_client.hkeys(KEY_MAP_ITEM_TO_MATCH))
         working_item_ids = redis_client.smembers(KEY_SNAPSHOT_WORKING)
@@ -296,6 +310,7 @@ def process_listing_message(data):
                 'registered_at': start_time_str, 
                 'expire_time': raw_item.get('date_auction_expire'),
                 'duration': raw_item.get('auction_duration'),
+                'item_option': raw_item.get('item_option')
             }
             
             try:

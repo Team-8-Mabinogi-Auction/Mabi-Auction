@@ -77,8 +77,12 @@ WSGI_APPLICATION = 'Mabinogi_Auction_Web.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': os.getenv('DB_ENGINE'),
+        'NAME': os.getenv('DB_NAME'),      # dbname
+        'USER': os.getenv('DB_USER'),          # user
+        'PASSWORD': os.getenv('DB_PASSWORD'), # password
+        'HOST': os.getenv('DB_HOST'),       # host
+        'PORT': os.getenv('DB_PORT'),            # port
     }
 }
 

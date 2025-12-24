@@ -86,19 +86,30 @@ class DBHandler:
         item_counts = {}
         try:
             with self.conn.cursor() as cur:
-                # 개별 조회가 아닌 GROUP BY를 통해 전체 스냅샷 로드
+                # [수정] count() -> SUM(item_count)로 변경하여 실제 수량 합산
+                # COALESCE를 사용하여 NULL일 경우 0으로 처리
                 sql = """
-                    SELECT item_name, SUM(item_count) 
+                    SELECT item_name, COALESCE(SUM(item_count), 0)
                     FROM mabi_auction.current_listings 
                     GROUP BY item_name
                 """
                 cur.execute(sql)
                 rows = cur.fetchall()
+                
                 for name, count in rows:
                     if name:
                         item_counts[name] = int(count)
+            
             self.conn.commit()
-            logger.info(f"[Init] Bulk loaded {len(item_counts)} items from DB.")
+            
+            # [디버깅] 실제로 몇 개나 로드되었는지 확인용 로그
+            if item_counts:
+                sample_key = list(item_counts.keys())[0]
+                logger.info(f"[Init] Total items loaded: {len(item_counts)} types.")
+                logger.info(f"[Init] Sample check - {sample_key}: {item_counts[sample_key]}")
+            else:
+                logger.warning("[Init] DB returned 0 items. Current Listings table might be empty.")
+                
         except Exception as e:
             logger.error(f"[DB Error] Bulk fetch failed: {e}", exc_info=True)
             self.conn.rollback()
@@ -156,16 +167,31 @@ consumer = KafkaConsumer(
     group_id='anomaly-detection-group'
 )
 
-# [핵심 수정] 루프 시작 전 전체 매물 수 동기화 (최초 1회 DB 조회)
-initial_counts = db_handler.fetch_all_market_counts()
-for name, count in initial_counts.items():
-    wb.update_market_count(name, count)
-
 logger.info(f"Anomaly Detector Started... Listening on {TOPIC_EVENTS}")
 
+is_initialized = False
 try:
     # 실행 루프
     for message in consumer:
+
+        # 첫 메시지 수신 시점에 DB 동기화
+        if not is_initialized:
+            logger.info("First event received. initializing market counts from DB...")
+
+            time.sleep(60)
+            
+            # 1. DB에서 전체 카운트 가져오기
+            initial_counts = db_handler.fetch_all_market_counts()
+            
+            # 2. WindowBuffer 업데이트
+            update_cnt = 0
+            for name, count in initial_counts.items():
+                wb.update_market_count(name, count)
+                update_cnt += 1
+            
+            is_initialized = True
+            logger.info(f"Initialization complete. Updated {update_cnt} items in WindowBuffer.")
+
         event = message.value
         event_type = event.get('event_type')
 

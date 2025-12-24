@@ -14,6 +14,16 @@ from kafka_auction.config.settings import (
 from kafka_auction.collector.kafka_producer import send_message, producer
 from kafka_auction.processor.utils import generate_match_signature, generate_full_signature
 
+# 장비 카테고리 목록
+EQUIPMENT_CATEGORIES = [
+    "검", "경갑옷", "꼬리", "날개", "너클", "도끼", "둔기", "듀얼건", "랜스", "로브",
+    "마기그래프", "마기그래프 도안", "마도서", "마리오네트", "모자/가발", "방패", "석궁",
+    "수리검", "스태프", "신발", "실린더", "아틀라틀", "악기", "액세서리", "양손 장비",
+    "얼굴 장식", "에이도스", "에코스톤", "오브", "옷본", "원드", "장갑", "중갑옷",
+    "천옷", "천옷/방직", "체인 블레이드", "토템", "팔리아스 유물", "한손 장비", "핸들",
+    "활", "기타 장비"
+]
+
 logging.basicConfig(level=LOG_LEVEL)
 logger = logging.getLogger(__name__)
 
@@ -46,16 +56,23 @@ def fetch_listings_page(
     return items, next_cursor
 
 
-def run_listings_cycle() -> None:
+def run_listings_cycle(category: str = None) -> None:
     """
     '한 번의 호출 주기'에 해당하는 전체 수집 사이클.
+
+    - cursor = "" 부터 시작해서 next_cursor가 없어질 때까지 반복
+    - 각 페이지(최대 500개)를 받아서 바로 Kafka로 전송
+    - 이 사이클 전체를 식별하는 cycle_id(타임스탬프 문자열)를 부여 -> 추후 dag 호출 시간으로 변경
+    
+    Args:
+        category: 처리할 카테고리 
     """
     # 주기 시작 시각
     KST = timezone(timedelta(hours=9))
     cycle_started_at_dt = datetime.now(KST)
     cycle_started_at = cycle_started_at_dt.isoformat()
 
-    auction_item_category = "모자/가발"
+    auction_item_category = category 
     # auction_item_category = ""  # 전체 데이터 가져올 때 공란으로 사용
 
     logger.info(
@@ -158,7 +175,15 @@ if __name__ == "__main__":
                 time.sleep(180)
             
             logger.info(f">>> Execution Start (Cycle {cycle_count})")
-            run_listings_cycle()
+            
+            # 장비 카테고리 목록을 루프로 돌면서 각 카테고리별로 사이클 실행
+            for category in EQUIPMENT_CATEGORIES:
+                logger.info(f">>> Processing category: '{category}'")
+                run_listings_cycle(category=category)
+                logger.info(f">>> Category '{category}' completed")
+            
+            logger.info(f">>> All equipment categories completed for Cycle {cycle_count}")
+            
     except KeyboardInterrupt:
         logger.info("Manual interruption detected. Stopping loop.")
 

@@ -3,7 +3,7 @@ import time
 import psycopg2
 import logging
 from kafka import KafkaConsumer
-from psycopg2.extras import execute_batch, RealDictCursor
+from psycopg2.extras import execute_batch, RealDictCursor, Json # [수정] Json 추가
 from datetime import datetime, timezone, timedelta
 
 # 로깅 설정
@@ -89,7 +89,9 @@ class AuctionDbSink:
         lookup_ids = set()
         for evt in self.event_buffer:
             if evt['event_type'] in ('SOLD', 'CANCEL'):
-                lookup_ids.add(evt['item_id'])
+                target_id = evt.get('item_id') or evt.get('match_id')
+                if target_id:
+                    lookup_ids.add(target_id)
         
         # 2. DB 일괄 조회
         db_items_map = self._fetch_existing_items(lookup_ids)
@@ -97,12 +99,12 @@ class AuctionDbSink:
         # 3. 배치 데이터 준비
         batch_logs = []       
         batch_ins_list = []   
-        batch_ins_opt = []    
+        # batch_ins_opt = [] # [수정] 옵션 테이블 사용 안 함
         batch_del_ids = []    
 
         for evt in self.event_buffer:
             e_type = evt.get('event_type')
-            item_id = evt.get('item_id')
+            item_id = evt.get('item_id') or evt.get('match_id')
             payload = evt.get('payload', {})
             processed_at = self.parse_time(evt.get('processed_at'))
 
@@ -115,8 +117,11 @@ class AuctionDbSink:
                 expire_time = self.parse_time(raw.get('date_auction_expire'))
                 duration = raw.get('auction_duration')
                 price = raw.get('auction_price_per_unit', 0)
+                
+                # [수정] 옵션 데이터를 JSONB로 저장
+                options_json = raw.get('item_option', [])
 
-                # Current Listings Insert
+                # Current Listings Insert (options 컬럼 추가)
                 batch_ins_list.append((
                     item_id,
                     raw.get('item_name'),
@@ -127,23 +132,11 @@ class AuctionDbSink:
                     start_time,
                     expire_time,
                     duration,
-                    processed_at
+                    processed_at,
+                    Json(options_json) # [추가] JSONB
                 ))
 
-                # Options Insert
-                opts = raw.get('item_option', [])
-                if opts:
-                    for o in opts:
-                        batch_ins_opt.append((
-                            item_id,
-                            o.get('option_type'),
-                            o.get('option_sub_type'),
-                            o.get('option_value'),
-                            o.get('option_value2'),
-                            o.get('option_desc')
-                        ))
-                
-                # Auction Log Insert
+                # Auction Log Insert (options 컬럼 추가)
                 batch_logs.append((
                     'REGISTER',
                     item_id,
@@ -156,7 +149,8 @@ class AuctionDbSink:
                     start_time,  # registered_at
                     duration,
                     expire_time, # ended_at (만료예정시각)
-                    processed_at
+                    processed_at,
+                    Json(options_json) # [추가] JSONB
                 ))
 
             # SOLD (판매)
@@ -181,6 +175,9 @@ class AuctionDbSink:
                 sold_price = history.get('auction_price_per_unit')
                 sold_time = self.parse_time(history.get('date_auction_buy'))
                 
+                # 판매 시점의 옵션 정보 저장
+                current_opts = target_data.get('options') if db_item else target_data.get('item_option', [])
+                
                 # Log Insert
                 batch_logs.append((
                     'SOLD',
@@ -194,7 +191,8 @@ class AuctionDbSink:
                     registered_at,
                     duration,
                     sold_time,      # ended_at (판매된 시간)
-                    processed_at
+                    processed_at,
+                    Json(current_opts) # [추가] JSONB
                 ))
 
                 if db_item:
@@ -217,19 +215,20 @@ class AuctionDbSink:
                         db_item.get('start_time'),        # registered_at
                         db_item.get('auction_duration'),  # duration
                         db_item.get('expire_time'),  # ended_at (만료 시각)
-                        processed_at
+                        processed_at,
+                        Json(db_item.get('options', [])) # [추가] JSONB
                     ))
                     batch_del_ids.append((item_id,))
 
         # 4. DB 반영
         try:
             with self.conn.cursor() as cur:
-                # (1) Log Insert
+                # (1) Log Insert - [수정] options 컬럼 추가
                 if batch_logs:
                     sql_log = """
                         INSERT INTO mabi_auction.auction_logs
-                        (event_type, item_id, auction_buy_id, item_name, item_display_name, item_count, item_category, price, registered_at, auction_duration, ended_at, created_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        (event_type, item_id, auction_buy_id, item_name, item_display_name, item_count, item_category, price, registered_at, auction_duration, ended_at, created_at, options)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         ON CONFLICT DO NOTHING
                     """
                     execute_batch(cur, sql_log, batch_logs)
@@ -239,25 +238,15 @@ class AuctionDbSink:
                     sql_del = "DELETE FROM mabi_auction.current_listings WHERE item_id = %s"
                     execute_batch(cur, sql_del, batch_del_ids)
 
-                # (3) Insert Listings
+                # (3) Insert Listings - [수정] options 컬럼 추가
                 if batch_ins_list:
                     sql_ins = """
                         INSERT INTO mabi_auction.current_listings
-                        (item_id, item_name, item_display_name, item_count, item_category, price, start_time, expire_time, auction_duration, created_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        (item_id, item_name, item_display_name, item_count, item_category, price, start_time, expire_time, auction_duration, created_at, options)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         ON CONFLICT (item_id) DO NOTHING
                     """
                     execute_batch(cur, sql_ins, batch_ins_list)
-
-                # (4) Insert Options
-                if batch_ins_opt:
-                    sql_opt = """
-                        INSERT INTO mabi_auction.item_options
-                        (item_id, option_type, option_sub_type, option_value, option_value2, option_desc)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                        ON CONFLICT DO NOTHING
-                    """
-                    execute_batch(cur, sql_opt, batch_ins_opt)
 
             self.conn.commit()
             logger.info(f"Batch Processed: Log({len(batch_logs)}), Ins({len(batch_ins_list)}), Del({len(batch_del_ids)})")

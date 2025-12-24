@@ -132,3 +132,25 @@ def calculate_start_time(expire_time_str: str):
         
     except Exception:
         return now_kst.isoformat(), now_kst.isoformat(), DEFAULT_DURATION
+
+
+def is_first_batch_ambiguous(hours_left: float, margin_minutes: float = 2.0) -> bool:
+    """
+    [셧다운 복구 전용 함수] 
+    서버 재가동 직후(First Batch) 처리 시,
+    남은 시간을 기준으로 해당 매물의 등록 시간 여부를 확정내릴 수 있는지 모호한지 판별
+    """
+    # 0~6시간 구간: 모호함 (08:00 등록(6h) vs 02:00 등록(12h) 구분 불가)
+    if hours_left <= 6.0:
+        return True
+
+    # 경계값(12, 24, 36...) 근처 구분 불가
+    candidates = [12, 24, 36, 48, 72]
+    margin_hours = margin_minutes / 60.0
+
+    for cand in candidates:
+        if abs(hours_left - cand) < margin_hours:
+            return True
+
+    # 그 외 구간 (6~12, 12~24 등) -> 확실함
+    return False

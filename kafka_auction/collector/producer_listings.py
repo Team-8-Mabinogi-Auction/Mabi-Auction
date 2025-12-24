@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Tuple
 import time
 
@@ -67,8 +67,9 @@ def run_listings_cycle(category: str = None) -> None:
     Args:
         category: 처리할 카테고리 
     """
-    # 주기 시작 시각 (사이클 ID 및 Kafka timestamp 기준) 
-    cycle_started_at_dt = datetime.now(timezone.utc)
+    # 주기 시작 시각
+    KST = timezone(timedelta(hours=9))
+    cycle_started_at_dt = datetime.now(KST)
     cycle_started_at = cycle_started_at_dt.isoformat()
 
     auction_item_category = category 
@@ -110,28 +111,25 @@ def run_listings_cycle(category: str = None) -> None:
         cursor_cnt += 1
 
         for item in items:
-            # 매칭용 해시 - 매칭 해시 추가(수정)
+            # 매칭용 해시 생성
             full_signature = generate_full_signature(item)
             match_signature = generate_match_signature(item)
             item["full_signature"] = full_signature
             item["match_signature"] = match_signature
 
-
             event = {
                 "type": "LISTING",
-                "cycle_id": cycle_started_at,   # 이 호출 주기 식별자 (나중에 S3에서 묶어보기 좋음)
+                "cycle_id": cycle_started_at,
                 "item_id" : full_signature,
                 "match_id": match_signature,
                 "raw": item,
             }
-
             
             send_message(
                 topic=TOPIC_LISTINGS_EQUIPMENTS,
                 key=full_signature,
                 value=event,
             )
-
 
         if not next_cursor or not items:
             logger.info("No next_cursor or no items. Ending cycle.")
@@ -142,17 +140,17 @@ def run_listings_cycle(category: str = None) -> None:
     # 사이클 종료 컨트롤 메시지
     end_event = {
         "type": "END_OF_CYCLE",
+        "cycle_id": cycle_started_at,
     }
 
     send_message(
         topic=TOPIC_LISTINGS_EQUIPMENTS,
-        #key=,
         value=end_event,
-        flush=True,  # 마지막에는 flush
+        flush=True,
     )
 
     # 사이클 종료 시각 및 경과 시간 계산
-    cycle_ended_at_dt = datetime.now(timezone.utc)
+    cycle_ended_at_dt = datetime.now(KST)
     elapsed_time = cycle_ended_at_dt - cycle_started_at_dt
     elapsed_seconds = elapsed_time.total_seconds()
 

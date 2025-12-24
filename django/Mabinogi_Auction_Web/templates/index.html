@@ -3,268 +3,475 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Mabinogi Auction System</title>
-    <style>
-        /* 기본 레이아웃 및 폰트 */
-        body { margin: 0; font-family: 'Malgun Gothic', sans-serif; background: #f4f4f4; color: #333; }
-
-        header { 
-            background: #333; padding: 25px 0; text-align: center; min-width: 1200px; transition: background 0.3s ease;
-        }
-        header:hover { background: #222; }
-
-        .logo-link { 
-            color: white; text-decoration: none; font-size: 28px; font-weight: bold; display: inline-block;
-            position: relative; transition: all 0.3s ease; letter-spacing: 1px;
-        }
-        .logo-link:hover { color: #ffca28; transform: scale(1.05); }
-        .logo-link::after {
-            content: ""; position: absolute; bottom: -8px; left: 50%; width: 0; height: 3px;
-            background: #ffca28; transition: all 0.3s ease; transform: translateX(-50%);
-        }
-        .logo-link:hover::after { width: 100%; }
-
-        .container { display: flex; min-height: 100vh; min-width: 1200px; }
-        
-        /* 사이드바 및 메인 영역 */
-        .sidebar-left { width: 220px; flex-shrink: 0; background: #ddd; padding: 20px; border-right: 1px solid #bbb; }
-        .main-content { flex: 1; padding: 30px; background: white; min-width: 750px; }
-        .sidebar-right { width: 280px; flex-shrink: 0; background: #f9f9f9; padding: 20px; border-left: 1px solid #bbb; }
-        .side-box { background: white; padding: 15px; margin-bottom: 20px; border-radius: 4px; border: 1px solid #ccc; }
-        
-        /* 메인 테이블 스타일 */
-        .item-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 20px; }
-        .item-table th { background: #e0e0e0; border-bottom: 2px solid #333; padding: 12px 5px; font-size: 14px; cursor: pointer; position: relative; }
-        .item-table th.sorted { background-color: #a0a0a0 !important; color: #fff !important; } 
-        .item-table td.sorted-col { background-color: #d8d8d8 !important; font-weight: 500; }
-        .item-table tr:hover td { background-color: #e2efff !important; }
-        .item-table th::after { content: ""; position: absolute; right: 8px; font-size: 11px; color: #888; }
-        .item-table th.asc::after { content: "▲"; color: #ff3b3b !important; font-weight: bold; } 
-        .item-table th.desc::after { content: "▼"; color: #2196f3 !important; font-weight: bold; }
-        .item-table td { border-bottom: 1px solid #ccc; padding: 10px 5px; text-align: center; font-size: 13px; height: 50px; color: #222; }
-        
-        /* 페이지네이션 */
-        .pagination { display: flex; justify-content: center; align-items: center; margin-top: 20px; gap: 5px; }
-        .page-btn { padding: 6px 12px; border: 1px solid #bbb; background: white; cursor: pointer; border-radius: 4px; font-size: 12px; }
-        .page-btn.active { background: #333; color: white; border-color: #333; }
-        .btn-more { background: #ff5722 !important; color: white !important; font-weight: bold; border: none; }
-        
-        /* 유틸리티 클래스 */
-        .col-img { width: 60px; } .col-name { width: 35%; text-align: left; } .col-count { width: 80px; } 
-        .col-unit { width: 140px; } .col-total { width: 160px; } .col-time { width: 120px; }
-        .text-right { text-align: right !important; padding-right: 15px !important; }
-        .thumb { width: 40px; height: 40px; object-fit: contain; border: 1px solid #ddd; background: #fff; border-radius: 4px; }
-        .item-name { color: #111; font-weight: bold; text-decoration: none; cursor:pointer; }
-        .item-name:hover { color: #d32f2f; text-decoration: underline; }
-
-        /* 사재기 탐지 섹션 스타일 */
-        .warning-item-box { padding: 12px 0; border-bottom: 1px solid #eee; }
-        .warning-item-box:last-child { border-bottom: none; }
-        .warning-label { font-size: 11px; font-weight: bold; padding: 2px 5px; border-radius: 3px; }
-        .label-경고 { background: #ffebee; color: #d32f2f; }
-        .label-의심 { background: #fff3e0; color: #ef6c00; }
-        .reason-tag { 
-            display: inline-block; margin-top: 8px; padding: 2px 8px; background: #f9f9f9; 
-            border: 1px solid #ddd; border-radius: 4px; font-size: 11px; cursor: help; color: #444; 
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mabi8On</title>
+    <link rel="icon" href="{% static 'img/favicon.ico' %}" type="image/x-icon">
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+    <script src="{% static 'js/index.js' %}" defer></script>
 </head>
 <body>
-    <header><a href="/" class="logo-link">Mabinogi Auction System</a></header>
-    
-    <div class="container">
-        <aside class="sidebar-left">
-            <div class="side-box">
-                <strong>아이템 검색</strong>
-                <form action="" method="get">
-                    <input type="text" name="search" placeholder="아이템 이름 입력" value="{{ search_query }}" style="width:100%; margin-top:10px; padding:6px; box-sizing:border-box;">
-                    <button type="submit" style="width:100%; margin-top:10px; padding:7px; background:#333; color:white; border:none; border-radius:3px; cursor:pointer;">검색</button>
-                </form>
-            </div>
-        </aside>
 
-        <main class="main-content">
-            <h3 style="margin-top: 0;">아이템 경매장 리스트</h3>
+<header>
+    <div class="header-inner">
+        <a href="/" class="logo-link">
+            <span>Mabi8On</span>
+        </a>
+    </div>
+</header>
+
+<div class="container">
+
+    <aside class="sidebar-left">
+        <div class="card category-card">
+            <h3>카테고리</h3>
+            <div class="category-accordion">
+                
+                <a href="?" class="cat-link-all {% if not current_category %}active{% endif %}">
+                    <i class="ph ph-squares-four"></i> 전체 보기
+                </a>
+
+                <details class="cat-group">
+                    <summary class="cat-summary">
+                        <div class="cat-title"><i class="ph ph-sword"></i> 근거리 장비</div>
+                        <i class="ph ph-caret-down cat-arrow"></i>
+                    </summary>
+                    <ul class="sub-cat-list">
+                        <li><a href="?category=한손 장비">한손 장비</a></li>
+                        <li><a href="?category=양손 장비">양손 장비</a></li>
+                        <li><a href="?category=검">검</a></li>
+                        <li><a href="?category=도끼">도끼</a></li>
+                        <li><a href="?category=둔기">둔기</a></li>
+                        <li><a href="?category=랜스">랜스</a></li>
+                        <li><a href="?category=핸들">핸들</a></li>
+                        <li><a href="?category=너클">너클</a></li>
+                        <li><a href="?category=체인 블레이드">체인 블레이드</a></li>
+                    </ul>
+                </details>
+
+                <details class="cat-group">
+                    <summary class="cat-summary">
+                        <div class="cat-title"><i class="ph ph-crosshair"></i> 원거리 장비</div>
+                        <i class="ph ph-caret-down cat-arrow"></i>
+                    </summary>
+                    <ul class="sub-cat-list">
+                        <li><a href="?category=활">활</a></li>
+                        <li><a href="?category=석궁">석궁</a></li>
+                        <li><a href="?category=듀얼건">듀얼건</a></li>
+                        <li><a href="?category=수리검">수리검</a></li>
+                        <li><a href="?category=아들라틀">아들라틀</a></li>
+                        <li><a href="?category=원거리 소모품">원거리 소모품</a></li>
+                    </ul>
+                </details>
+
+                <details class="cat-group">
+                    <summary class="cat-summary">
+                        <div class="cat-title"><i class="ph ph-magic-wand"></i> 마법 장비</div>
+                        <i class="ph ph-caret-down cat-arrow"></i>
+                    </summary>
+                    <ul class="sub-cat-list">
+                        <li><a href="?category=실린더">실린더</a></li>
+                        <li><a href="?category=스태프">스태프</a></li>
+                        <li><a href="?category=원드">원드</a></li>
+                        <li><a href="?category=마도서">마도서</a></li>
+                        <li><a href="?category=오브">오브</a></li>
+                    </ul>
+                </details>
+
+                <details class="cat-group">
+                    <summary class="cat-summary">
+                        <div class="cat-title"><i class="ph ph-t-shirt"></i> 갑옷 장비</div>
+                        <i class="ph ph-caret-down cat-arrow"></i>
+                    </summary>
+                    <ul class="sub-cat-list">
+                        <li><a href="?category=중갑옷">중갑옷</a></li>
+                        <li><a href="?category=경갑옷">경갑옷</a></li>
+                        <li><a href="?category=천옷">천옷</a></li>
+                    </ul>
+                </details>
+
+                <details class="cat-group">
+                    <summary class="cat-summary">
+                        <div class="cat-title"><i class="ph ph-shield-check"></i> 방어 장비</div>
+                        <i class="ph ph-caret-down cat-arrow"></i>
+                    </summary>
+                    <ul class="sub-cat-list">
+                        <li><a href="?category=장갑">장갑</a></li>
+                        <li><a href="?category=신발">신발</a></li>
+                        <li><a href="?category=모자/가발">모자/가발</a></li><li><a href="?category=방패">방패</a></li>
+                        <li><a href="?category=로브">로브</a></li>
+                    </ul>
+                </details>
+
+                <details class="cat-group">
+                    <summary class="cat-summary">
+                        <div class="cat-title"><i class="ph ph-sketch-logo"></i> 액세서리</div>
+                        <i class="ph ph-caret-down cat-arrow"></i>
+                    </summary>
+                    <ul class="sub-cat-list">
+                        <li><a href="?category=얼굴 장식">얼굴 장식</a></li>
+                        <li><a href="?category=액세서리">액세서리</a></li>
+                        <li><a href="?category=날개">날개</a></li>
+                        <li><a href="?category=꼬리">꼬리</a></li>
+                    </ul>
+                </details>
+
+                <details class="cat-group">
+                    <summary class="cat-summary">
+                        <div class="cat-title"><i class="ph ph-star"></i> 특수 장비</div>
+                        <i class="ph ph-caret-down cat-arrow"></i>
+                    </summary>
+                    <ul class="sub-cat-list">
+                        <li><a href="?category=악기">악기</a></li>
+                        <li><a href="?category=생활 도구">생활 도구</a></li>
+                        <li><a href="?category=마리오네트">마리오네트</a></li>
+                        <li><a href="?category=에코스톤">에코스톤</a></li>
+                        <li><a href="?category=에이도스">에이도스</a></li>
+                        <li><a href="?category=팔리아스 유물">팔리아스 유물</a></li>
+                        <li><a href="?category=기타 장비">기타 장비</a></li>
+                    </ul>
+                </details>
+
+                <details class="cat-group">
+                    <summary class="cat-summary">
+                        <div class="cat-title"><i class="ph ph-house-line"></i> 설치물</div>
+                        <i class="ph ph-caret-down cat-arrow"></i>
+                    </summary>
+                    <ul class="sub-cat-list">
+                        <li><a href="?category=의자">의자/사물</a></li>
+                        <li><a href="?category=낭만농장">낭만농장/달빛섬</a></li>
+                    </ul>
+                </details>
+
+                <details class="cat-group">
+                    <summary class="cat-summary">
+                        <div class="cat-title"><i class="ph ph-sparkle"></i> 인챈트</div>
+                        <i class="ph ph-caret-down cat-arrow"></i>
+                    </summary>
+                    <ul class="sub-cat-list">
+                        <li><a href="?category=인챈트 스크롤">인챈트 스크롤</a></li>
+                        <li><a href="?category=마법가루">마법가루</a></li>
+                    </ul>
+                </details>
+
+                <details class="cat-group">
+                    <summary class="cat-summary">
+                        <div class="cat-title"><i class="ph ph-scroll"></i> 스크롤</div>
+                        <i class="ph ph-caret-down cat-arrow"></i>
+                    </summary>
+                    <ul class="sub-cat-list">
+                        <li><a href="?category=도면">도면</a></li>
+                        <li><a href="?category=옷본">옷본</a></li>
+                        <li><a href="?category=마족 스크롤">마족 스크롤</a></li>
+                        <li><a href="?category=기타 스크롤">기타 스크롤</a></li>
+                    </ul>
+                </details>
+
+                <details class="cat-group">
+                    <summary class="cat-summary">
+                        <div class="cat-title"><i class="ph ph-pencil-circle"></i> 마기그래프</div>
+                        <i class="ph ph-caret-down cat-arrow"></i>
+                    </summary>
+                    <ul class="sub-cat-list">
+                        <li><a href="?category=마기그래프">마기그래프</a></li>
+                        <li><a href="?category=마기그래프 도안">마기그래프 도안</a></li>
+                        <li><a href="?category=기타 재료">기타 재료</a></li>
+                    </ul>
+                </details>
+
+                <details class="cat-group">
+                    <summary class="cat-summary">
+                        <div class="cat-title"><i class="ph ph-book"></i> 서적</div>
+                        <i class="ph ph-caret-down cat-arrow"></i>
+                    </summary>
+                    <ul class="sub-cat-list">
+                        <li><a href="?category=책">책</a></li>
+                        <li><a href="?category=마비노벨">마비노벨</a></li>
+                        <li><a href="?category=페이지">페이지</a></li>
+                    </ul>
+                </details>
+
+                <details class="cat-group">
+                    <summary class="cat-summary">
+                        <div class="cat-title"><i class="ph ph-flask"></i> 소모품</div>
+                        <i class="ph ph-caret-down cat-arrow"></i>
+                    </summary>
+                    <ul class="sub-cat-list">
+                        <li><a href="?category=포션">포션</a></li>
+                        <li><a href="?category=음식">음식</a></li>
+                        <li><a href="?category=허브">허브</a></li>
+                        <li><a href="?category=던전 통행증">던전 통행증</a></li>
+                        <li><a href="?category=일반 훈련석">일반 훈련석</a></li>
+                        <li><a href="?category=개조석">개조석</a></li>
+                        <li><a href="?category=보석">보석</a></li>
+                        <li><a href="?category=변신 메달">변신 메달</a></li>
+                        <li><a href="?category=염색 앰플">염색 앰플</a></li>
+                        <li><a href="?category=스케치">스케치</a></li>
+                        <li><a href="?category=핀즈비즈">핀즈비즈</a></li>
+                        <li><a href="?category=기타 소모품">기타 소모품</a></li>
+                    </ul>
+                </details>
+
+                <details class="cat-group">
+                    <summary class="cat-summary">
+                        <div class="cat-title"><i class="ph ph-medal"></i> 토템</div>
+                        <i class="ph ph-caret-down cat-arrow"></i>
+                    </summary>
+                    <ul class="sub-cat-list">
+                        <li><a href="?category=애뮬릿">애뮬릿</a></li>
+                        <li><a href="?category=토템">토템</a></li>
+                    </ul>
+                </details>
+
+                <details class="cat-group">
+                    <summary class="cat-summary">
+                        <div class="cat-title"><i class="ph ph-yarn"></i> 생활 재료</div>
+                        <i class="ph ph-caret-down cat-arrow"></i>
+                    </summary>
+                    <ul class="sub-cat-list">
+                        <li><a href="?category=주머니">주머니</a></li>
+                        <li><a href="?category=천옷/방직">천옷/방직</a></li>
+                        <li><a href="?category=제련/블랙스미스">제련/블랙스미스</a></li>
+                        <li><a href="?category=힐웬 공학">힐웬 공학</a></li>
+                        <li><a href="?category=매직 크래프트">매직 크래프트</a></li>
+                    </ul>
+                </details>
+
+                <details class="cat-group">
+                    <summary class="cat-summary">
+                        <div class="cat-title"><i class="ph ph-dots-three-circle"></i> 기타</div>
+                        <i class="ph ph-caret-down cat-arrow"></i>
+                    </summary>
+                    <ul class="sub-cat-list">
+                        <li><a href="?category=제스처">제스처</a></li>
+                        <li><a href="?category=말풍선 스티커">말풍선 스티커</a></li>
+                        <li><a href="?category=피니 펫">피니 펫</a></li>
+                        <li><a href="?category=불타래">불타래</a></li>
+                        <li><a href="?category=퍼퓸">퍼퓸</a></li>
+                        <li><a href="?category=분양 메달">분양 메달</a></li>
+                        <li><a href="?category=뷰티 쿠폰">뷰티 쿠폰</a></li>
+                        <li><a href="?category=기타">기타</a></li>
+                    </ul>
+                </details>
+
+            </div>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        
+        <section class="card search-section">
+            <form id="searchForm" action="" method="get">
+                {% if current_category %}
+                <input type="hidden" name="category" value="{{ current_category }}">
+                {% endif %}
+
+                <div class="search-bar-wrapper">
+                    <i class="ph ph-magnifying-glass search-icon"></i>
+                    <input 
+                        type="text" 
+                        name="search" 
+                        placeholder="아이템명을 입력하세요" 
+                        value="{{ search_query }}" 
+                        class="search-input"
+                    >
+                    <button type="submit" class="btn-primary">검색</button>
+                </div>
+
+                <button type="button" id="toggleFilterBtn" class="btn-toggle-options">
+                    <i class="ph ph-faders"></i> 상세 검색 옵션
+                </button>
+
+                <div id="filterController" class="filter-controller" style="display: none;">
+                    <div class="controller-inner">
+                        <select id="filterSelect" class="filter-select">
+                            <option value="" disabled selected>세부 옵션을 선택하세요.</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="activeFilters" class="active-filters-list">
+                </div>
+
+            </form>
+        </section>
+
+        <div class="section-header-row">
+            <div class="title-group">
+                <h2>
+                    {% if search_query or current_category %}
+                        검색 결과
+                    {% else %}
+                        실시간 매물
+                    {% endif %}
+                </h2>
+                
+                <span class="list-info-text">
+                    {% if search_query or current_category %}
+                        총 <span style="color: #ff6b6b; font-weight: bold;">{{ total_count }}</span>개가 검색되었습니다.
+                    {% else %}
+                        전체 보기 결과는 최신 등록 매물로 최대 100건만 표시됩니다.
+                    {% endif %}
+                </span>
+            </div>
+            <span class="refresh-time">{{ last_update_text }}</span>
+        </div>
+
+        <div class="card table-card">
             <table class="item-table" id="itemTable">
+                <body data-sort="{{ sort_by }}" data-dir="{{ direction }}">
+
                 <thead>
                     <tr>
-                        <th class="col-img">이미지</th>
-                        <th class="col-name" onclick="sortTable(1, 'str', this)">아이템 이름</th>
-                        <th class="col-count" onclick="sortTable(2, 'num', this)">수량</th>
-                        <th class="col-unit" onclick="sortTable(3, 'num', this)">개당 금액</th>
-                        <th class="col-total" onclick="sortTable(4, 'num', this)">총 금액</th>
-                        <th class="col-time" onclick="sortTable(5, 'num', this)">남은 시간</th>
+                        <th style="width: 80px;">이미지</th>
+                        
+                        <th class="sortable" onclick="serverSort('name')">
+                            아이템명 
+                            <i class="ph {% if sort_by == 'name' %}{% if direction == 'asc' %}ph-caret-up{% else %}ph-caret-down{% endif %}{% else %}ph-caret-up-down{% endif %} sort-icon"></i>
+                        </th>
+
+                        <th class="sortable" onclick="serverSort('category')">
+                            카테고리 
+                            <i class="ph {% if sort_by == 'category' %}{% if direction == 'asc' %}ph-caret-up{% else %}ph-caret-down{% endif %}{% else %}ph-caret-up-down{% endif %} sort-icon"></i>
+                        </th>
+
+                        <th class="sortable" onclick="serverSort('count')">
+                            수량 
+                            <i class="ph {% if sort_by == 'count' %}{% if direction == 'asc' %}ph-caret-up{% else %}ph-caret-down{% endif %}{% else %}ph-caret-up-down{% endif %} sort-icon"></i>
+                        </th>
+
+                        <th class="sortable" onclick="serverSort('unit_price')">
+                            가격(1개) 
+                            <i class="ph {% if sort_by == 'unit_price' %}{% if direction == 'asc' %}ph-caret-up{% else %}ph-caret-down{% endif %}{% else %}ph-caret-up-down{% endif %} sort-icon"></i>
+                        </th>
+
+                        <th class="sortable" onclick="serverSort('sort_val')">
+                            남은 시간 
+                            <i class="ph {% if sort_by == 'sort_val' %}{% if direction == 'asc' %}ph-caret-up{% else %}ph-caret-down{% endif %}{% else %}ph-caret-up-down{% endif %} sort-icon"></i>
+                        </th>
+                        
+                        <th style="cursor: default;">옵션</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
-                    {% for item in items %}
-                    <tr>
-                        <td><img src="{% static item.display_img %}" class="thumb" onerror="this.src='{% static 'images/mabi_logo.jpg' %}';"></td>
-                        <td style="text-align: left;"><a href="/item/{{ item.name|urlencode }}/" class="item-name">{{ item.name }}</a></td>
-                        <td>{{ item.count }}</td>
-                        <td class="text-right" data-value="{{ item.unit_price|cut:',' }}">{{ item.unit_price }}</td>
-                        <td class="text-right" data-value="{{ item.total_price|cut:',' }}" style="font-weight: bold;">{{ item.total_price }}</td>
-                        <td data-value="{{ item.sort_val }}">{{ item.display_time }}</td>
-                    </tr>
-                    {% endfor %}
+                    {% for item in page_obj %}
+                        <tr>
+                            <td class="col-img">
+                                <div class="thumb-wrapper">
+                                    {% if item.display_img %}
+                                        <img src="{{ item.display_img }}" 
+                                             class="thumb-img" 
+                                             alt="{{ item.name }}"
+                                             loading="lazy"
+                                             onerror="this.parentElement.innerHTML='<div class=\'thumb-placeholder\'><i class=\'ph ph-image-broken\'></i></div>'">
+                                    {% else %}
+                                        <div class="thumb-placeholder">
+                                            <i class="ph ph-image"></i> </div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td class="text-left">
+                                <a href="/item/{{ item.name|urlencode }}/?page=1" class="item-name">{{ item.name }}</a>
+                            </td>
+                            <td class="text-left">{{ item.category }}</td>
+                            <td class="text-center num-text">{{ item.count }}</td>
+                            
+                            <td class="text-right num-text" data-value="{{ item.unit_price }}">
+                                {{ item.unit_price_display }} <span>G</span>
+                            </td>
+                            
+                            <td class="text-right time-text" data-value="{{ item.sort_val }}">{{ item.display_time }}</td>
+                            
+                            <td class="text-center">
+                                {% if item.options %}
+                                    <button type="button" class="btn-icon" data-options="{{ item.options }}">
+                                        <i class="ph ph-magnifying-glass-plus"></i>
+                                    </button>
+                                {% else %}
+                                    <span style="color: #ccc; cursor: default;">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 50px; color: #666;">
+                                <i class="ph ph-warning-circle" style="font-size: 24px; vertical-align: middle;"></i><br>
+                                <span style="margin-top: 10px; display: inline-block;">
+                                    표시할 경매장 매물이 없습니다.
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
                 </tbody>
             </table>
-            <div id="pagination" class="pagination"></div>
-        </main>
+        </div>
 
-        <aside class="sidebar-right">
-            <h3>상태 정보</h3>
-            <div id="statusBox" class="side-box"></div>
-        
-            <div class="side-box" style="padding: 0; overflow: hidden; border-top: none;">
-                <div style="height: 4px; background-color: #d32f2f; width: 100%;"></div>
-                
-                <div style="padding: 15px;">
-                    <strong style="color: #d32f2f; display: block; margin-bottom: 12px; font-size: 15px;">⚠️ 사재기 경고 아이템</strong>
-                    <div id="warningList">
-                        {% for warn in warning_items %}
-                        <div class="warning-item-box">
-                            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                                <div style="max-width: 160px;">
-                                    <div style="font-size: 13px; font-weight: bold; color: #111;">{{ warn.name }}</div>
-                                    <div style="font-size: 11px; color: #888; margin-top: 3px;">
-                                        ID: {{ warn.id }} | {{ warn.price }} G
-                                    </div>
-                                </div>
-                                <span class="warning-label label-{{ warn.level }}">{{ warn.level }}</span>
-                            </div>
-                            <div class="reason-tag" title="{{ warn.reason_detail }}">
-                                <strong>{{ warn.reason_code }}</strong>. {{ warn.reason_label }}
-                            </div>
-                        </div>
-                        {% empty %}
-                        <div style="text-align: center; padding: 20px; color: #999; font-size: 12px;">감지된 이상 내역이 없습니다.</div>
-                        {% endfor %}
+        <div id="pagination" class="pagination">
+            {% if page_obj.has_other_pages %}
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}&sort={{ sort_by }}&dir={{ direction }}{% if current_category %}&category={{ current_category }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" class="page-link">&laquo;</a>
+                {% endif %}
+
+                {% for p in page_obj.paginator.page_range %}
+                    {% if page_obj.number|add:'-5' <= p and p <= page_obj.number|add:'5' %}
+                        <a href="?page={{ p }}&sort={{ sort_by }}&dir={{ direction }}{% if current_category %}&category={{ current_category }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                        class="page-link {% if p == page_obj.number %}active{% endif %}">
+                        {{ p }}
+                        </a>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}&sort={{ sort_by }}&dir={{ direction }}{% if current_category %}&category={{ current_category }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" class="page-link">&raquo;</a>
+                {% endif %}
+            {% endif %}
+        </div>
+    </main>
+
+    <aside class="sidebar-right">
+        <div class="card warning-container">
+            <div class="warning-header">
+                <div class="wh-top">
+                    <h3>사재기 감지</h3>
+                    <span class="live-indicator"></span>
+                </div>
+                <p class="wh-desc">
+                    TIP : 최근 10분 내 사재기 의심 항목을 표시합니다.
+                </p>
+            </div>
+            
+            <div class="warning-list">
+                {% for warn in alerts %}
+                <div class="warning-item">
+                    <div class="wi-header">
+                        <span class="wi-name">{{ warn.item_name }}</span>
+                        <span class="wi-badge {{ warn.level_class }}">{{ warn.level_text }}</span>
+                    </div>
+
+                    <div class="wi-meta">
+                        <span class="wi-detail">{{ warn.reason_text }}</span>
+                        <span class="wi-time">{{ warn.display_time }}</span>
+                    </div>
+
+                    <div class="wi-tags">
+                        <span class="tag-label">{{ warn.badge_tag }}</span>
                     </div>
                 </div>
+                {% empty %}
+                <div class="wi-empty">
+                    <i class="ph ph-shield-check"></i>
+                    <p>이상 탐지된 아이템이 없습니다.</p>
+                </div>
+                {% endfor %}
             </div>
-        </aside>
-    </div>
+        </div>
+    </aside>
 
-    <script>
-        let currentPage = 1;
-        const rowsPerPage = 10;
-        let allRows = [];
-        let offset = 100; 
-        let serverHasMore = {{ has_more|yesno:"true,false" }};
-        let currentSortIdx = -1; 
-
-        window.onload = () => refreshRowList();
-
-        function refreshRowList() {
-            allRows = Array.from(document.getElementById("tableBody").rows);
-            updateStatus();
-            displayPage(currentPage);
-        }
-
-        function updateStatus() {
-            const totalPages = Math.ceil(allRows.length / rowsPerPage);
-            document.getElementById("statusBox").innerHTML = `
-                <strong>현재 로드 상태</strong>
-                <div style="font-size:12px; color:#666; margin-top:5px;">데이터: ${allRows.length}개</div>
-                <div style="font-size:12px; color:#666;">페이지: ${currentPage} / ${totalPages}</div>
-            `;
-        }
-
-        function displayPage(page) {
-            currentPage = page;
-            const start = (page - 1) * rowsPerPage;
-            const end = start + rowsPerPage;
-            
-            allRows.forEach((row, index) => {
-                row.style.display = (index >= start && index < end) ? "" : "none";
-                Array.from(row.cells).forEach((cell, cellIdx) => {
-                    if (cellIdx === currentSortIdx) cell.classList.add("sorted-col");
-                    else cell.classList.remove("sorted-col");
-                });
-            });
-            renderPagination();
-            updateStatus();
-        }
-
-        function renderPagination() {
-            const paginationContainer = document.getElementById("pagination");
-            paginationContainer.innerHTML = "";
-            const totalPages = Math.ceil(allRows.length / rowsPerPage);
-            if (allRows.length === 0) return;
-
-            const createBtn = (text, onClick, disabled = false, className = "page-btn") => {
-                const btn = document.createElement("button");
-                btn.innerHTML = text; btn.className = className;
-                btn.disabled = disabled; btn.onclick = onClick;
-                return btn;
-            };
-
-            paginationContainer.appendChild(createBtn("« 처음", () => displayPage(1), currentPage === 1));
-            paginationContainer.appendChild(createBtn("◀", () => displayPage(currentPage - 1), currentPage === 1));
-
-            let startPage = Math.max(1, currentPage - 2);
-            let endPage = Math.min(totalPages, startPage + 4);
-            if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
-
-            for (let i = startPage; i <= endPage; i++) {
-                if(i >= 1 && i <= totalPages) {
-                    paginationContainer.appendChild(createBtn(i, () => displayPage(i), false, i === currentPage ? "page-btn active" : "page-btn"));
-                }
-            }
-
-            paginationContainer.appendChild(createBtn("▶", () => displayPage(currentPage + 1), currentPage === totalPages));
-
-            if (currentPage === totalPages && serverHasMore) {
-                paginationContainer.appendChild(createBtn("데이터 더 가져오기 ↓", loadMoreData, false, "page-btn btn-more"));
-            } else {
-                paginationContainer.appendChild(createBtn(`끝(${totalPages}) »`, () => displayPage(totalPages), currentPage === totalPages));
-            }
-        }
-
-        function loadMoreData() {
-            fetch(`?search={{ search_query }}&offset=${offset}`, {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            })
-            .then(res => res.json())
-            .then(data => {
-                const tbody = document.getElementById("tableBody");
-                data.items.forEach(item => {
-                    const row = tbody.insertRow();
-                    row.innerHTML = `
-                        <td><img src="/static/${item.display_img}" class="thumb" onerror="this.src='/static/images/mabi_logo.jpg';"></td>
-                        <td style="text-align: left;"><a href="/item/${encodeURIComponent(item.name)}/" class="item-name">${item.name}</a></td>
-                        <td>${item.count}</td>
-                        <td class="text-right" data-value="${item.unit_price.replace(/,/g, '')}">${item.unit_price}</td>
-                        <td class="text-right" data-value="${item.total_price.replace(/,/g, '')}" style="font-weight: bold;">${item.total_price}</td>
-                        <td data-value="${item.sort_val}">${item.display_time}</td>
-                    `;
-                });
-                offset += data.items.length;
-                serverHasMore = data.has_more;
-                refreshRowList();
-            });
-        }
-
-        function sortTable(n, type, headerEl) {
-            let dir = headerEl.getAttribute("data-dir") === "asc" ? "desc" : "asc";
-            currentSortIdx = n;
-            document.querySelectorAll("th").forEach(th => {
-                th.removeAttribute("data-dir"); th.classList.remove("sorted", "asc", "desc");
-            });
-            headerEl.setAttribute("data-dir", dir);
-            headerEl.classList.add("sorted", dir);
-
-            allRows.sort((a, b) => {
-                let x = a.cells[n].getAttribute("data-value") || a.cells[n].innerText.trim();
-                let y = b.cells[n].getAttribute("data-value") || b.cells[n].innerText.trim();
-                if (type === 'num') return dir === "asc" ? parseFloat(x) - parseFloat(y) : parseFloat(y) - parseFloat(x);
-                return dir === "asc" ? x.localeCompare(y, 'ko') : y.localeCompare(x, 'ko');
-            });
-            const tbody = document.getElementById("tableBody");
-            tbody.append(...allRows);
-            displayPage(1);
-        }
-    </script>
+</div>
 </body>
 </html>

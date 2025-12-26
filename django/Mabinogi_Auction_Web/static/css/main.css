@@ -852,9 +852,9 @@ header {
 
 .footer-links { display: flex; gap: 16px; font-size: 13px; margin-bottom: 8px; justify-content: flex-end; }
 .footer-links a:hover { color: var(--primary); text-decoration: underline; }
-.copyright { font-size: 12px; color: #cbd5e1; display: block; text-align: right; }
+.copyright { font-size: 12px; color: #cbd5e1; display: block; text-align: right; padding-top: 43px;}
 
 @media (max-width: 768px) {
     .footer-inner { flex-direction: column; gap: 20px; text-align: center; }
-    .footer-links, .copyright { justify-content: center; text-align: center; }
+    .copyright { justify-content: center; text-align: center;}
 }

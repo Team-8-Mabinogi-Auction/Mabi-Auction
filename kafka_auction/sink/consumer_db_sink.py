@@ -5,6 +5,8 @@ import logging
 from kafka import KafkaConsumer
 from psycopg2.extras import execute_batch, RealDictCursor, Json # [수정] Json 추가
 from datetime import datetime, timezone, timedelta
+import os
+from processor.utils import require_env
 
 # 로깅 설정
 logging.basicConfig(
@@ -15,20 +17,20 @@ logging.basicConfig(
 logger = logging.getLogger("AuctionDbSink")
 
 # 설정
-KAFKA_BOOTSTRAP_SERVERS = ['localhost:9092']
-TOPIC_EVENTS = 'auction.events'
-GROUP_ID = 'db-sink-final-v2'
+KAFKA_BOOTSTRAP_SERVERS = [require_env("KAFKA_BOOTSTRAP_SERVERS")]
+TOPIC_EVENTS = require_env("TOPIC_EVENTS")
+GROUP_ID = require_env("KAFKA_DB_SINK_GROUP_ID")
 
 DB_CONFIG = {
-    'host': 'localhost',
-    'dbname': 'mydatabase',
-    'user': 'myuser',
-    'password': 'mypassword',
-    'port': 5432
+    'host': require_env("DB_HOST"),
+    'dbname': require_env("DB_NAME"),
+    'user': require_env("DB_USER"),
+    'password': require_env("DB_PASSWORD"),
+    'port': int(require_env("DB_PORT")),
 }
 
-BATCH_SIZE = 500
-FLUSH_INTERVAL = 1.0
+BATCH_SIZE = os.getenv("DB_SINK_BATCH_SIZE", 500, int)
+FLUSH_INTERVAL = os.getenv("DB_SINK_FLUSH_INTERVAL", 1.0, float)
 KST = timezone(timedelta(hours=9))
 
 class AuctionDbSink:
@@ -70,7 +72,7 @@ class AuctionDbSink:
         try:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
                 sql = """
-                    SELECT * FROM mabi_auction.current_listings 
+                    SELECT * FROM mabi_raw.current_listings 
                     WHERE item_id = ANY(%s)
                 """
                 cur.execute(sql, (list(item_ids),))
@@ -226,7 +228,7 @@ class AuctionDbSink:
                 # (1) Log Insert - [수정] options 컬럼 추가
                 if batch_logs:
                     sql_log = """
-                        INSERT INTO mabi_auction.auction_logs
+                        INSERT INTO mabi_raw.auction_logs
                         (event_type, item_id, auction_buy_id, item_name, item_display_name, item_count, item_category, price, registered_at, auction_duration, ended_at, created_at, options)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         ON CONFLICT DO NOTHING
@@ -235,13 +237,13 @@ class AuctionDbSink:
 
                 # (2) Delete Listings
                 if batch_del_ids:
-                    sql_del = "DELETE FROM mabi_auction.current_listings WHERE item_id = %s"
+                    sql_del = "DELETE FROM mabi_raw.current_listings WHERE item_id = %s"
                     execute_batch(cur, sql_del, batch_del_ids)
 
                 # (3) Insert Listings - [수정] options 컬럼 추가
                 if batch_ins_list:
                     sql_ins = """
-                        INSERT INTO mabi_auction.current_listings
+                        INSERT INTO mabi_raw.current_listings
                         (item_id, item_name, item_display_name, item_count, item_category, price, start_time, expire_time, auction_duration, created_at, options)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         ON CONFLICT (item_id) DO NOTHING

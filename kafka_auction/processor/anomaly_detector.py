@@ -6,26 +6,27 @@ from kafka import KafkaConsumer, KafkaProducer
 from window_buffer import WindowBuffer
 import logging
 import sys
+import os
+from utils import require_env
 
 # 설정
-KAFKA_BROKER = 'localhost:9092'
-TOPIC_EVENTS = 'auction.events'
-TOPIC_ANOMALY = 'auction.anomaly'
+KAFKA_BROKER = require_env("KAFKA_BROKER")
+TOPIC_EVENTS = require_env("KAFKA_TOPIC_EVENTS")
+TOPIC_ANOMALY = require_env("KAFKA_TOPIC_ANOMALY")
 
 # DB 접속 정보
 DB_CONFIG = {
-    'host': 'localhost',
-    'dbname': 'mydatabase',
-    'user': 'myuser',
-    'password': 'mypassword',
-    'port': 5432
+    "host": require_env("DB_HOST"),
+    "dbname": require_env("DB_NAME"),
+    "user": require_env("DB_USER"),
+    "password": require_env("DB_PASSWORD"),
+    "port": int(require_env("DB_PORT")),
 }
-
 DETECTOR_CONFIG = {
-    'SWEEPING_RATIO': 0.1,      # 매점 판단 비율
-    'MANIPULATION_RATIO': 0.1,    # 매석 판단 비율
-    'HIGH_PRICE_MULTIPLIER': 1.2,  # 고가 판단 기준
-    'ALERT_COOLDOWN_SEC': 60       # 알림 재발송 쿨타임
+    "SWEEPING_RATIO": float(os.getenv("SWEEPING_RATIO", 0.1)),                  # 매점 판단 비율
+    "MANIPULATION_RATIO": float(os.getenv("MANIPULATION_RATIO", 0.1)),          # 매석 판단 비율
+    "HIGH_PRICE_MULTIPLIER": float(os.getenv("HIGH_PRICE_MULTIPLIER", 1.2)),    # 고가 판단 기준
+    "ALERT_COOLDOWN_SEC": int(os.getenv("ALERT_COOLDOWN_SEC", 60)),             # 알림 재발송 쿨타임
 }
 
 logging.basicConfig(
@@ -90,7 +91,7 @@ class DBHandler:
                 # COALESCE를 사용하여 NULL일 경우 0으로 처리
                 sql = """
                     SELECT item_name, COALESCE(SUM(item_count), 0)
-                    FROM mabi_auction.current_listings 
+                    FROM mabi_raw.current_listings 
                     GROUP BY item_name
                 """
                 cur.execute(sql)
@@ -125,7 +126,7 @@ class DBHandler:
             with self.conn.cursor() as cur:
                 # [수정] SyntaxError 해결: 컬럼 개수와 VALUES 개수를 6개로 일치시킴
                 sql = """
-                    INSERT INTO mabi_auction.anomaly_logs 
+                    INSERT INTO mabi_raw.anomaly_logs 
                     (detection_time, event_time, item_name, anomaly_type, description, id)
                     VALUES (%s, %s, %s, %s, %s, %s)
                 """

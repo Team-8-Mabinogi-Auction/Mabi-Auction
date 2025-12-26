@@ -1,18 +1,20 @@
 import redis
 import json
+import os
+from utils import require_env
 
 # Redis 접속 정보 및 윈도우 설정
 REDIS_CONFIG = {
-    'host': 'localhost',
-    'port': 6379,
-    'db': 0,
-    'decode_responses': True  # 바이트 -> 문자열 자동 변환
+    'host': require_env('REDIS_HOST'),
+    'port': int(require_env('REDIS_PORT')),
+    'db': int(require_env('REDIS_DB')),
+    'decode_responses': True
 }
 
 WINDOW_SETTINGS = {
-    'SOLD_SEC': 600,  # 판매 집계 윈도우 (10분)
-    'REG_SEC': 300,    # 등록 패턴 감시 윈도우 (5분)
-    'REGISTER_GRACE_SEC': 30     # 등록 지연 처리 (30초)
+    'SOLD_SEC': os.getenv('SOLD_WINDOW_SEC', 600, int),
+    'REG_SEC': os.getenv('REG_WINDOW_SEC', 300, int),
+    'REGISTER_GRACE_SEC': os.getenv('REGISTER_GRACE_SEC', 30, int)
 }
 
 class WindowBuffer:

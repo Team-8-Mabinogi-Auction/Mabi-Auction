@@ -71,7 +71,6 @@ def get_recent_alerts(limit=5):
 
             ratio = data.get('ratio', 0)
             reason_code = data.get('reason')
-            high_ratio = data.get('ratio', 0)
             ref_price = data.get('ref_price_avg', 0)
             reg_price = data.get('reg_price', 0)
 
@@ -80,14 +79,14 @@ def get_recent_alerts(limit=5):
             if reason_code == "MANIPULATION":
                 data['level_text'] = "경고"
                 data['level_class'] = "badge-danger"
-                data['reason_text'] = f"{price_multiplier:.1f}배 고가 등록. (판매량의 {high_ratio*100:.0f}%)"
+                data['reason_text'] = f"평균 대비 {price_multiplier:.1f}배 고가로 등록되었습니다."
                 data['badge_tag'] = "시세조작"
 
             elif reason_code == "SWEEPING":
                 velocity = data.get('velocity_10min', 0)
                 data['level_text'] = "의심"
                 data['level_class'] = "badge-warn"
-                data['reason_text'] = f"{velocity}개의 매물 판매. ({ratio*100:.0f}% 소진)"
+                data['reason_text'] = f"{velocity}개의 매물이 판매되었습니다. ({ratio*100:.0f}% 소진)"
                 data['badge_tag'] = "대량구매"
 
             alerts.append(data)

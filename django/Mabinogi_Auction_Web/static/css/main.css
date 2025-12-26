@@ -526,17 +526,17 @@ header {
 
 /* 3. 아이콘이 뜰 자리 스타일 (회색 박스) */
 .thumb-placeholder {
-    width: 100%;
-    height: 100%;
+    width: 40px;
+    height: 40px;
     display: flex;             /* 아이콘 정중앙 정렬용 */
     align-items: center;
     justify-content: center;
-    color: #9ca3af;            /* 아이콘 색상 (회색) */
+    color: #b3b9c2;            /* 아이콘 색상 (회색) */
 }
 
 /* 4. 아이콘 크기 설정 */
 .thumb-placeholder i {
-    font-size: 20px; /* 아이콘 크기 조절 */
+    font-size: 18px; /* 아이콘 크기 조절 */
 }
 
 .btn-icon {

@@ -28,4 +28,61 @@ class MabiPriceStats(models.Model):
 
     class Meta:
         managed = False  # Django가 테이블을 새로 만들지 않도록 설정
-        db_table = 'mabi_item_price_averages'  # 실제 DB 테이블 이름
+        db_table = '"mabi_analytics"."mabi_item_price_averages:'  # 실제 DB 테이블 이름
+
+# 1. 아이템 정적 정보 (이미지, 설명, 링크 등)
+class ItemStaticInfo(models.Model):
+    item_name = models.CharField(primary_key=True, max_length=200)
+    item_desc = models.TextField(null=True)
+    img_thumbnail = models.CharField(max_length=500, null=True)
+    img_ingame = models.CharField(max_length=500, null=True)
+    external_link = models.CharField(max_length=500, null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False  # Django가 테이블을 생성/수정하지 않음
+        db_table = '"mabi_auction"."item_info"' # 스키마.테이블명
+
+
+# 2. 아이템 시간별 시세 통계 (차트용)
+class ItemHourlyStats(models.Model):
+    # 복합키지만 조회용으로 bucket_hour를 PK로 설정 (실제 쓰기 작업은 안 하므로 무관)
+    bucket_hour = models.DateTimeField(primary_key=True)
+    item_display_name = models.CharField(max_length=100)
+    item_category = models.CharField(max_length=50)
+
+    # 등록 가격 (Reg)
+    reg_price_max = models.BigIntegerField(null=True)
+    reg_price_min = models.BigIntegerField(null=True)
+    reg_price_avg = models.DecimalField(max_digits=20, decimal_places=2, null=True)
+    reg_count = models.BigIntegerField(null=True)
+
+    # 판매 가격 (Sold)
+    sold_price_max = models.BigIntegerField(null=True)
+    sold_price_min = models.BigIntegerField(null=True)
+    sold_price_avg = models.DecimalField(max_digits=20, decimal_places=2, null=True)
+    sold_count = models.BigIntegerField(null=True)
+
+    class Meta:
+        managed = False
+        db_table = '"mabi_analytics"."item_display_hourly_stats"'
+
+class AuctionLog(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    event_type = models.CharField(max_length=20)
+    item_id = models.CharField(max_length=64)
+    auction_buy_id = models.CharField(max_length=64, null=True)
+    item_name = models.CharField(max_length=100, null=True)
+    item_display_name = models.CharField(max_length=100)
+    item_count = models.IntegerField()
+    item_category = models.CharField(max_length=50)
+    price = models.BigIntegerField()     # 판매가
+    registered_at = models.DateTimeField(null=True)
+    auction_duration = models.IntegerField(null=True)
+    ended_at = models.DateTimeField()    # 판매 시각
+    options = models.JSONField(null=True) # JSONB 필드
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        db_table = '"mabi_auction"."auction_logs"'

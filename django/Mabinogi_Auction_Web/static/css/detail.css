@@ -1,0 +1,371 @@
+:root {
+    --primary: #2563eb;
+    --primary-bg: #eff6ff;
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --border: #e2e8f0;
+    --bg-page: #f8fafc;
+    --danger: #ef4444;
+}
+
+body {
+    background-color: var(--bg-page);
+    color: var(--text-primary);
+    font-family: 'Pretendard', sans-serif;
+    margin: 0;
+}
+
+.container { max-width: 1280px; margin: 0 auto; padding: 0 20px; }
+
+/* [핵심 수정] 레이아웃 비율 조정 (사이드바 260px로 축소) */
+.detail-layout {
+    display: grid;
+    grid-template-columns: 1fr 260px; /* 기존 320px -> 260px */
+    gap: 20px;
+    margin-top: 40px;
+    margin-bottom: 80px;
+    align-items: start;
+}
+
+@media (max-width: 1024px) {
+    .detail-layout { grid-template-columns: 1fr; }
+}
+
+/* 카드 공통 */
+.card {
+    background: #fff; border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; margin-bottom: 20px;
+}
+
+/* 1. Item Header */
+.item-header-card { display: flex; gap: 20px; padding: 20px; }
+.item-visual { flex-shrink: 0; }
+.img-wrapper-large {
+    width: 100px; height: 100px; /* 이미지 크기도 살짝 조정 */
+    border: 1px solid var(--border); border-radius: 8px;
+    background: #fff; display: flex; align-items: center; justify-content: center;
+    padding: 5px;
+}
+.img-wrapper-large img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.item-info { flex: 1; min-width: 0; }
+.info-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.category-badge { background: var(--primary-bg); color: var(--primary); font-size: 12px; padding: 4px 8px; border-radius: 4px; font-weight: 600; }
+.item-title { margin: 0; font-size: 22px; font-weight: 700; color: var(--text-primary); line-height: 1.2; }
+.item-desc { color: var(--text-secondary); font-size: 14px; line-height: 1.5; margin-bottom: 16px; word-break: keep-all; }
+
+/* 인게임 이미지 & 버튼 */
+.ingame-img-simple {
+    display: block;           /* 블록 요소로 만들어 줄바꿈 */
+    max-width: 100%;          /* 부모 컨테이너 너비보다는 커지지 않게 설정 */
+    width: auto;              /* 가로 폭은 비율에 맞춰 자동 조절 */
+    height: auto;             /* 세로 높이도 비율에 맞춰 자동 조절 */
+    max-height: 300px;        /* ★ 최대 세로 높이 제한 (이 값을 조절하여 크기 변경) ★ */
+    
+    /* 중앙 정렬 및 하단 간격 */
+    margin: 0 0 20px 0;
+
+    border-radius: 8px;       /* 모서리 둥글게 */
+    border: 1px solid var(--border); /* 깔끔한 테두리 */
+}
+.btn-external {
+    flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 8px 12px; background: #fff; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text-primary); text-decoration: none; font-size: 13px; font-weight: 500; transition: 0.2s; white-space: nowrap;
+}
+.btn-external:hover { background: #f1f5f9; }
+
+/* 2. Chart */
+.chart-card { min-height: 300px; }
+.card-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 20px 10px 16px; border-bottom: 1px solid var(--border); }
+.card-header h3 { margin: 0; font-size: 16px; font-weight: 700; gap:7px;}
+.chart-body { padding: 16px; height: 250px; position: relative; }
+.no-data-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--text-secondary); font-size: 14px; }
+
+.btn-chart-period {
+    padding: 4px 12px;
+    font-size: 12px;
+    border: 1px solid #ddd;
+    background-color: #fff;
+    border-radius: 15px;
+    cursor: pointer;
+    color: #666;
+    transition: all 0.2s;
+}
+
+.btn-chart-period:hover {
+    background-color: #f3f4f6;
+}
+
+/* 활성화된 버튼 (진한 색) */
+.btn-chart-period.active {
+    background-color: var(--primary); /* 메인 테마 색상 (없으면 #3b82f6 등으로 대체) */
+    border-color: var(--primary);
+    color: #fff;
+    font-weight: 700;
+}
+
+/* 3. List Section */
+.list-section { margin-top: 24px; }
+.tab-nav { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+.tab-btn {
+    background: none; border: none; padding: 10px 16px; font-size: 15px; font-weight: 600;
+    color: var(--text-secondary); cursor: pointer; border-bottom: 2px solid transparent;
+    display: flex; align-items: center; gap: 6px;
+}
+.tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+.badge-count { background: var(--primary); color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 8px; }
+.badge-count.sub { background: #94a3b8; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Table */
+.item-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.item-table th { background: #f8fafc; color: var(--text-secondary); font-weight: 600; padding: 10px; font-size: 13px; border-bottom: 1px solid var(--border); }
+.item-table td { padding: 12px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; font-size: 14px; }
+.num-text { font-family: 'Roboto Mono', monospace; letter-spacing: -0.5px; }
+.num-text span { font-size: 11px; color: #94a3b8; }
+.bold { font-weight: 700; }
+.price-up { color: var(--text-primary); }
+.sub-price { color: var(--primary); font-weight: 600; font-size: 13px; }
+.time-text { color: #94a3b8; font-size: 12px; }
+.option-cell div { font-size: 12px; color: var(--text-secondary); margin-bottom: 2px; padding-left: 6px; border-left: 2px solid var(--border); }
+.empty-row { text-align: center; padding: 40px; color: #94a3b8; }
+
+/* 옵션 한 줄 */
+.option-row {
+    display: flex;
+    align-items: center; /* 수직 중앙 정렬 */
+    gap: 6px;            /* 색상 박스와 텍스트 사이 간격 */
+    margin-bottom: 2px;
+    padding-left: 8px;
+    border-left: 2px solid var(--border);
+}
+
+/* 색상 미리보기 박스 */
+.color-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;     /* 살짝 둥글게 */
+    border: 1px solid rgba(0,0,0,0.2); /* 흰색 아이템일 때를 대비해 테두리 추가 */
+    flex-shrink: 0;         /* 줄바꿈 시 찌그러짐 방지 */
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* =========================
+   Sidebar Filter Controller
+========================= */
+
+/* 사이드바 헤더 영역 */
+.filter-header {
+    padding: 16px 5px 10px 0px;
+    border-bottom: 1px solid var(--border);
+}
+
+.filter-header h3 {
+    margin: 0px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    
+    /* Flexbox로 배치 */
+    display: flex;
+    align-items: center;      /* 수직 중앙 정렬 */
+    justify-content: flex-start; /* 왼쪽 정렬 (가장 중요) */
+    gap: 6px;                 /* 아이콘과 텍스트 사이의 좁은 간격 */
+}
+
+/* 아이콘 크기 및 정렬 보정 */
+.filter-header h3 i {
+    font-size: 18px;          /* 텍스트보다 살짝 크게 */
+    display: flex;            /* 아이콘 자체 높이 중앙 정렬 이슈 방지 */
+}
+
+.filter-desc {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+/* 필터 컨트롤러 (드롭다운 영역 컨테이너) */
+.filter-controller {
+    margin-top: 12px;
+    width: 100%;
+    /* 애니메이션 효과 (선택사항) */
+    animation: slideDown 0.2s ease-out;
+}
+
+.controller-inner {
+    display: flex; 
+    align-items: center;
+    width: 100%;
+}
+
+/* 드롭박스 스타일 수정 (레퍼런스 반영 + 사이드바 최적화) */
+.filter-select {
+    width: 100%;          /* [수정] 사이드바에서는 꽉 차게 보여야 해서 100%로 변경 */
+    padding: 8px 10px;    /* 레퍼런스 값 */
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background-color: #fff;
+    cursor: pointer;
+    
+    /* [요청사항 반영] 작고 회색 글씨 */
+    font-size: 13px;      
+    color: var(--text-secondary); /* #6b7280 */
+    font-weight: 500;
+    
+    /* 기본 화살표 유지 (브라우저 기본값) */
+    appearance: auto; 
+}
+
+/* 포커스 됐을 때 (클릭 시) */
+.filter-select:focus { 
+    outline: none; 
+    border-color: var(--primary); 
+    color: var(--text-primary); /* 선택 시 글자 진하게 */
+    background-color: #fff;
+}
+
+/* 활성화된 필터 리스트 (입력폼들이 쌓이는 곳) */
+.active-filters-list {
+    display: flex; 
+    flex-direction: column; 
+    gap: 8px;
+    margin-top: 12px;
+}
+.active-filters-list:empty { margin-top: 0; }
+
+/* 애니메이션 정의 */
+@keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+
+/* 3. 개별 필터 카드 (Card 형태) */
+.filter-row {
+    display: flex; 
+    flex-direction: column; /* [핵심] 가로 -> 세로 배치 변경 */
+    gap: 8px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    animation: fadeIn 0.2s;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+
+/* 필터 제목 영역 (상단) */
+.fr-header {
+    width: 100%; /* 너비 꽉 채움 */
+    display: flex; 
+    justify-content: space-between; /* 제목 좌측, 삭제버튼 우측 */
+    align-items: center;
+    font-size: 13px; 
+    font-weight: 700; 
+    color: var(--text-primary);
+    border-bottom: 1px solid #f1f5f9; /* 우측 구분선 -> 하단 구분선 */
+    border-right: none;
+    padding-bottom: 6px;
+    margin-bottom: 4px;
+    margin-right: 0;
+}
+
+/* 삭제 버튼 (헤더 안으로 이동) */
+.fr-remove {
+    background: none; border: none; cursor: pointer;
+    color: #cbd5e1; font-size: 16px;
+    padding: 0;
+    display: flex; align-items: center;
+    transition: 0.2s;
+}
+.fr-remove:hover { color: var(--danger); }
+
+/* 필터 입력 영역 (하단) */
+.fr-body {
+    width: 100%;
+    display: flex; 
+    align-items: center; 
+    gap: 6px; 
+    flex-wrap: wrap; /* 내용 많으면 줄바꿈 */
+}
+
+/* 입력 필드 공통 */
+.fr-input {
+    flex: 1; /* 남은 공간 모두 차지 */
+    padding: 8px;
+    border: 1px solid var(--border); 
+    border-radius: 4px;
+    font-size: 13px;
+    width: 100%; /* 기본적으로 꽉 차게 */
+    box-sizing: border-box;
+}
+
+/* 범위 입력용 (Min ~ Max) */
+.range-group {
+    display: flex; align-items: center; gap: 4px; width: 100%;
+}
+.fr-input.short { 
+    flex: 1; /* 반반 나눠가지기 */
+    text-align: center;
+    min-width: 0; 
+} 
+.fr-dash { color: var(--text-secondary); font-weight: 400; font-size: 12px; }
+
+/* RGB 전용 스타일 */
+.rgb-group {
+    display: flex; gap: 4px; width: 100%; justify-content: space-between;
+}
+.fr-input.rgb {
+    width: 30% !important; /* 3등분 */
+    padding: 6px 0;
+    text-align: center;
+    font-size: 12px;
+}
+
+/* 애니메이션 */
+@keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* 셀렉트 박스 */
+.df-select {
+    width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px;
+    font-size: 13px; color: var(--text-primary); margin-bottom: 12px;
+    background-color: #f8fafc; cursor: pointer;
+}
+
+/* 추가된 필터 리스트 */
+.active-filters-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+
+/* 개별 필터 행 (좁은 사이드바에 맞춤) */
+.filter-row {
+    background: #fff; border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px; position: relative;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+.fr-header {
+    font-size: 12px; font-weight: 700; color: var(--text-primary);
+    margin-bottom: 6px; display: flex; justify-content: space-between;
+}
+.fr-remove {
+    background: none; border: none; color: #cbd5e1; cursor: pointer; padding: 0; font-size: 14px;
+}
+.fr-remove:hover { color: var(--danger); }
+
+.fr-body { display: flex; gap: 4px; align-items: center; }
+.fr-input {
+    flex: 1; padding: 6px; border: 1px solid var(--border); border-radius: 4px;
+    font-size: 12px; min-width: 0; /* Flexbox 넘침 방지 */
+}
+.fr-dash { color: #cbd5e1; font-size: 12px; }
+
+/* 버튼 그룹 */
+.filter-actions { display: flex; gap: 6px; margin-top: 10px; }
+.btn-apply {
+    flex: 2; background: var(--text-primary); color: #fff; border: none;
+    padding: 10px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.btn-reset {
+    flex: 1; background: #fff; border: 1px solid var(--border); color: var(--text-secondary);
+    padding: 10px; border-radius: 6px; font-size: 12px; cursor: pointer;
+}
+.btn-reset:hover { background: #f1f5f9; }
+
+.no-filter-msg { text-align: center; color: #cbd5e1; font-size: 12px; padding: 20px 0; }

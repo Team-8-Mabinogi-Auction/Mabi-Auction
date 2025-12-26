@@ -41,6 +41,7 @@ logger = logging.getLogger("AnomalyDetector")
 # KST 타임존
 KST = timezone(timedelta(hours=9))
 
+WARMUP_DURATION = os.getenv("WARMUP_DURATION", 600)
 
 class DBHandler:
     """
@@ -153,7 +154,6 @@ class DBHandler:
 # 초기화
 wb = WindowBuffer()
 db_handler = DBHandler(DB_CONFIG)
-# initialized_items = set()  <-- 전체 로딩 방식을 쓰므로 더 이상 필요 없음
 
 producer = KafkaProducer(
     bootstrap_servers=KAFKA_BROKER,
@@ -170,16 +170,20 @@ consumer = KafkaConsumer(
 
 logger.info(f"Anomaly Detector Started... Listening on {TOPIC_EVENTS}")
 
+start_time = time.time()
 is_initialized = False
+
 try:
     # 실행 루프
     for message in consumer:
+        now_ts = time.time()
+
+        if now_ts - start_time < WARMUP_DURATION:
+            continue
 
         # 첫 메시지 수신 시점에 DB 동기화
         if not is_initialized:
             logger.info("First event received. initializing market counts from DB...")
-
-            time.sleep(60)
             
             # 1. DB에서 전체 카운트 가져오기
             initial_counts = db_handler.fetch_all_market_counts()

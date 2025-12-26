@@ -387,8 +387,12 @@
                             <td class="text-right time-text" data-value="{{ item.sort_val }}">{{ item.display_time }}</td>
                             
                             <td class="text-center">
-                                {% if item.options %}
-                                    <button type="button" class="btn-icon" data-options="{{ item.options }}">
+                                {% if item.options and item.options != '[]' %}
+                                    <button type="button" class="btn-icon btn-open-modal" 
+                                            data-options="{{ item.options }}"
+                                            data-name="{{ item.name }}"
+                                            data-img="{{ item.display_img }}"
+                                            data-category="{{ item.category }}">
                                         <i class="ph ph-magnifying-glass-plus"></i>
                                     </button>
                                 {% else %}
@@ -413,12 +417,20 @@
 
         <div id="pagination" class="pagination">
             {% if page_obj.has_other_pages %}
-                {% if page_obj.has_previous %}
-                    <a href="?page={{ page_obj.previous_page_number }}&sort={{ sort_by }}&dir={{ direction }}{% if current_category %}&category={{ current_category }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" class="page-link">&laquo;</a>
+                
+                <a href="?page=1&sort={{ sort_by }}&dir={{ direction }}{% if current_category %}&category={{ current_category }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                class="page-link page-control" title="첫 페이지">&laquo;</a>
+
+                {% if page_obj.number > 5 %}
+                    <a href="?page={{ page_obj.number|add:'-5' }}&sort={{ sort_by }}&dir={{ direction }}{% if current_category %}&category={{ current_category }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                    class="page-link page-control" title="-5 페이지">&lsaquo;</a>
+                {% else %}
+                    <a href="?page=1&sort={{ sort_by }}&dir={{ direction }}{% if current_category %}&category={{ current_category }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                    class="page-link page-control" title="-5 페이지">&lsaquo;</a>
                 {% endif %}
 
                 {% for p in page_obj.paginator.page_range %}
-                    {% if page_obj.number|add:'-5' <= p and p <= page_obj.number|add:'5' %}
+                    {% if page_obj.number|add:'-3' <= p and p <= page_obj.number|add:'3' %}
                         <a href="?page={{ p }}&sort={{ sort_by }}&dir={{ direction }}{% if current_category %}&category={{ current_category }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" 
                         class="page-link {% if p == page_obj.number %}active{% endif %}">
                         {{ p }}
@@ -426,9 +438,16 @@
                     {% endif %}
                 {% endfor %}
 
-                {% if page_obj.has_next %}
-                    <a href="?page={{ page_obj.next_page_number }}&sort={{ sort_by }}&dir={{ direction }}{% if current_category %}&category={{ current_category }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" class="page-link">&raquo;</a>
+                {% if page_obj.number|add:'5' < page_obj.paginator.num_pages %}
+                    <a href="?page={{ page_obj.number|add:'5' }}&sort={{ sort_by }}&dir={{ direction }}{% if current_category %}&category={{ current_category }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                        class="page-link page-control" title="+5 페이지">&rsaquo;</a>
+                {% else %}
+                    <a href="?page={{ page_obj.paginator.num_pages }}&sort={{ sort_by }}&dir={{ direction }}{% if current_category %}&category={{ current_category }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                        class="page-link page-control" title="+5 페이지">&rsaquo;</a>
                 {% endif %}
+
+                <a href="?page={{ page_obj.paginator.num_pages }}&sort={{ sort_by }}&dir={{ direction }}{% if current_category %}&category={{ current_category }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" 
+                class="page-link page-control" title="마지막 페이지">&raquo;</a>
             {% endif %}
         </div>
     </main>
@@ -473,5 +492,29 @@
     </aside>
 
 </div>
+
+<div id="optionModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <button type="button" class="btn-close-modal"><i class="ph ph-x"></i></button>
+        
+        <div class="modal-header">
+            <div class="modal-thumb">
+                <img id="modalImg" src="" alt="Item" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+                <div class="thumb-placeholder" style="display:none"><i class="ph ph-image"></i></div>
+            </div>
+            <div class="modal-title-group">
+                <span id="modalCategory" class="modal-cat-badge">카테고리</span>
+                <h3 id="modalItemName">아이템 이름</h3>
+            </div>
+        </div>
+        
+        <div class="modal-body">
+            <h4 class="opt-title">세부 옵션</h4>
+            <ul id="modalOptionList" class="modal-opt-list">
+                </ul>
+        </div>
+    </div>
+</div>
+{% include 'footer.html' %}
 </body>
 </html>

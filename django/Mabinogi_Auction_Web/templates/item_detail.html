@@ -1,205 +1,274 @@
 {% load static %}
+{% load humanize %}
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>{{ item.name }} - 상세 정보</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ item_name }} - Mabi8On</title>
+    <link rel="icon" href="{% static 'img/favicon.ico' %}" type="image/x-icon">
+    
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body { margin: 0; font-family: 'Malgun Gothic', sans-serif; background: #f4f4f4; color: #333; }
 
-        /* 메인 페이지와 동일한 헤더 호버 애니메이션 */
-        header { 
-            background: #333; 
-            padding: 25px 0; 
-            text-align: center; 
-            min-width: 1200px; 
-        }
-        header:hover { background: #222; }
-
-        .logo-link { 
-            color: white; 
-            text-decoration: none; 
-            font-size: 28px; 
-            font-weight: bold; 
-            display: inline-block;
-            position: relative;
-            transition: all 0.3s ease;
-            letter-spacing: 1px;
-        }
-        .logo-link:hover { color: #ffca28; transform: scale(1.05); }
-        .logo-link::after {
-            content: ""; position: absolute; bottom: -8px; left: 50%; width: 0; height: 3px;
-            background: #ffca28; transition: all 0.3s ease; transform: translateX(-50%);
-        }
-        .logo-link:hover::after { width: 100%; }
-
-        .container { display: flex; min-height: 100vh; min-width: 1200px; }
-        
-        /* 사이드바 */
-        .sidebar-left { width: 220px; flex-shrink: 0; background: #ddd; padding: 20px; border-right: 1px solid #bbb; }
-        .side-box { background: white; padding: 15px; margin-bottom: 20px; border-radius: 4px; border: 1px solid #ccc; }
-        
-        /* 본문 영역 - 버튼이 빠진 만큼 상단 여백을 조정했습니다 */
-        .main-content { flex: 1; padding: 50px 40px; background: white; }
-
-        /* 아이템 상단 요약 */
-        .detail-header { display: flex; gap: 35px; margin-bottom: 35px; border-bottom: 1px solid #eee; padding-bottom: 35px; }
-        .detail-img { width: 150px; height: 150px; object-fit: contain; border: 1px solid #ddd; background: #fff; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .detail-info h1 { margin: 0 0 15px 0; font-size: 34px; color: #111; }
-        .detail-desc { line-height: 1.8; color: #555; font-size: 15px; background: #f9f9f9; padding: 20px; border-radius: 6px; border-left: 5px solid #ffca28; }
-
-        /* 차트 영역 */
-        .chart-section { background: #fff; padding: 25px; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 40px; box-shadow: 0 3px 10px rgba(0,0,0,0.03); }
-        .chart-title { font-size: 19px; font-weight: bold; margin-bottom: 20px; color: #333; }
-        .chart-container { position: relative; height: 380px; width: 100%; }
-
-        /* 하단 탭 */
-        .tab-menu { display: flex; gap: 5px; margin-bottom: -1px; }
-        .tab-btn { padding: 14px 40px; border: 1px solid #ccc; background: #f0f0f0; cursor: pointer; border-radius: 8px 8px 0 0; font-weight: bold; font-size: 15px; transition: 0.2s; }
-        .tab-btn.active { background: white; border-bottom: 1px solid white; color: #d32f2f; }
-        .tab-content { border: 1px solid #ccc; padding: 30px; border-radius: 0 8px 8px 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
-
-        /* 테이블 스타일 */
-        .item-table { width: 100%; border-collapse: collapse; }
-        .item-table th { background: #f8f9fa; border-bottom: 2px solid #333; padding: 15px; font-size: 14px; color: #444; }
-        .item-table td { border-bottom: 1px solid #eee; padding: 15px; text-align: center; font-size: 14px; }
-        .text-right { text-align: right !important; padding-right: 40px !important; }
-        .price-highlight { color: #d32f2f; font-weight: bold; }
-        .hidden { display: none; }
-    </style>
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+    <link rel="stylesheet" href="{% static 'css/detail.css' %}">
+    
+    <script src="{% static 'js/detail.js' %}" defer></script>
 </head>
 <body>
-    <header><a href="/" class="logo-link">Mabinogi Auction System</a></header>
 
-    <div class="container">
-        <aside class="sidebar-left">
-            <div class="side-box">
-                <strong>아이템 검색</strong>
-                <form action="/" method="get">
-                    <input type="text" name="search" placeholder="아이템 이름 입력" style="width: 100%; margin-top: 10px; padding: 6px; box-sizing: border-box;">
-                    <button type="submit" style="width: 100%; margin-top: 10px; padding: 7px; background: #333; color: white; border: none; cursor: pointer; border-radius: 3px;">검색</button>
-                </form>
-            </div>
-        </aside>
+<header>
+    <div class="header-inner">
+        <a href="/" class="logo-link">
+            <span>Mabi8On</span>
+        </a>
+    </div>
+</header>
 
-        <main class="main-content">
-            <div class="detail-header">
-                <img src="{% static item.thumb %}" class="detail-img" onerror="this.src='{% static 'images/mabi_logo.jpg' %}';">
-                <div class="detail-info">
-                    <h1>{{ item.name }}</h1>
-                    <div class="detail-desc">{{ item.desc|linebreaksbr }}</div>
+<div class="container detail-layout">
+
+    <main class="detail-content">
+        <section class="card item-header-card">
+            <div class="item-visual">
+                <div class="img-wrapper-large">
+                    {% if item_img %}
+                        <img src="{{ item_img }}" alt="{{ item_name }}" onerror="this.parentElement.innerHTML='<div class=\'placeholder-large\'><i class=\'ph ph-image-broken\'></i></div>'">
+                    {% else %}
+                        <div class="placeholder-large"><i class="ph ph-image"></i></div>
+                    {% endif %}
                 </div>
             </div>
+            
+            <div class="item-info">
+                <div class="info-top">
+                    <span class="category-badge">{{ item_category|default:"아이템" }}</span>
+                    <h1 class="item-title">{{ item_name }}</h1>
+                </div>
+                
+                <p class="item-desc">
+                    {{ item_desc|default:"상세 설명 데이터가 없습니다." }}
+                </p>
 
-            <div class="chart-section">
-                <div class="chart-title">📈 시간별 가격 변동 추이 (개당 금액)</div>
-                <div class="chart-container">
-                    <canvas id="priceTimeChart"></canvas>
+                {% if ingame_img_url %}
+                    <div style="margin-bottom: 20px;">
+                        <img src="{{ ingame_img_url }}" alt="인게임 이미지" class="ingame-img-simple" loading="lazy"> 
+                    </div>
+                {% endif %}
+
+                <div class="action-row">
+                    {% if external_link %}
+                        <a href="{{ external_link }}" target="_blank" class="btn-external">
+                            <i class="ph ph-arrow-square-out"></i> 정보 상세보기 (라바뉴의 마비노기)
+                        </a>
+                    {% else %}
+                        <a href="https://mabinogi.nexon.com/page/main/index.asp" target="_blank" class="btn-external">
+                            <i class="ph ph-magnifying-glass"></i> 공홈 검색
+                        </a>
+                    {% endif %}
                 </div>
             </div>
+        </section>
 
-            <div class="tab-menu">
-                <button class="tab-btn active" onclick="switchTab('sale')">실시간 매물</button>
-                <button class="tab-btn" onclick="switchTab('history')">체결 시세</button>
+        <section class="card chart-card">
+            <div class="card-header">
+                <h3><i class="ph ph-chart-line-up"></i> 최근 시세 변동</h3>
+                <div class="chart-controls" style="display:flex; gap:6px;">
+                    <button type="button" class="btn-chart-period active" onclick="updateChartPeriod(7)" id="btnPeriod7">최근 1주</button>
+                    <button type="button" class="btn-chart-period" onclick="updateChartPeriod(1)" id="btnPeriod1">최근 1일</button>
+                </div>
             </div>
+            <div class="chart-body">
+                <canvas id="priceChart"></canvas>
+                <div id="noChartData" class="no-data-msg" style="display:none;">데이터가 없습니다.</div>
+            </div>
+        </section>
 
-            <div id="tab-sale" class="tab-content">
+        <section class="list-section">
+             <div class="tab-nav">
+                <button class="tab-btn active" data-tab="current">현재 등록 매물 <span class="badge-count">{{ current_listings|length }}</span></button>
+                <button class="tab-btn" data-tab="history">과거 판매 이력 <span class="badge-count sub">{{ sales_history|length }}</span></button>
+            </div>
+            <div class="card table-card tab-content active" id="tab-current">
                 <table class="item-table">
                     <thead>
                         <tr>
-                            <th>수량</th>
-                            <th>개당 금액</th>
-                            <th>총 금액</th>
-                            <th>남은 시간</th>
+                            {% if has_options %}
+                                <th width="20%" class="text-center">가격</th>
+                                <th width="60%" class="text-left">상세 옵션</th>
+                                <th width="20%" class="text-right">남은 시간</th>
+                            {% else %}
+                                <th width="25%" class="text-center">개당 가격</th>
+                                <th width="20%" class="text-center">수량</th>
+                                <th width="30%" class="text-center">총 가격</th>
+                                <th width="25%" class="text-right">남은 시간</th>
+                            {% endif %}
                         </tr>
                     </thead>
                     <tbody>
-                        {% for l in listings %}
+                        {% for item in current_listings %}
                         <tr>
-                            <td>{{ l.count }}</td>
-                            <td class="text-right price-highlight">{{ l.unit_price }} G</td>
-                            <td class="text-right" style="font-weight: bold;">{{ l.total_price }} G</td>
-                            <td style="color:#777;">{{ l.display_time }}</td>
+                            {% if has_options %}
+                                <td class="text-center num-text bold price-up">{{ item.price|intcomma }} <span>G</span></td>
+                                
+                                <td class="text-left option-cell">
+                                    {% if item.parsed_options and item.parsed_options|length > 0 %}
+                                        {% for line in item.parsed_options %}
+                                            <div class="option-row">
+                                                {{ line.text }}
+                                                
+                                                {% if line.color_css %}
+                                                    <span class="color-dot" style="background-color: {{ line.color_css }};" title="색상 미리보기"></span>
+                                                {% endif %}
+                                            </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <span class="no-opt" style="color:#ccc; font-size:12px;">(세부 옵션 없음)</span>
+                                    {% endif %}
+                                </td>
+                                                                
+                                <td class="text-center time-text">
+                                    {% if item.is_urgent %}
+                                        <span style="color: #ef4444; font-weight: bold;">{{ item.display_time }}</span>
+                                    {% else %}
+                                        {{ item.display_time }}
+                                    {% endif %}
+                                </td>
+                            {% else %}
+                                <td class="text-center num-text bold">{{ item.price|intcomma }} <span>G</span></td>
+                                <td class="text-center num-text">{{ item.item_count|intcomma }}</td>
+                                <td class="text-center num-text sub-price">
+                                    {% widthratio item.price 1 item.item_count as t %}{{ t|intcomma }} <span>G</span>
+                                </td>
+                                <td class="text-center time-text">
+                                    {% if item.is_urgent %}
+                                        <span style="color: #ef4444; font-weight: bold;">{{ item.display_time }}</span>
+                                    {% else %}
+                                        {{ item.display_time }}
+                                    {% endif %}
+                                </td>
+                            {% endif %}
                         </tr>
                         {% empty %}
-                        <tr><td colspan="4" style="padding: 50px; color: #999;">현재 경매장에 매물이 없습니다.</td></tr>
+                        <tr><td colspan="4" class="empty-row">등록된 매물이 없습니다.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
+            <div class="card table-card tab-content" id="tab-history" style="display: none;">
+                <table class="item-table">
+                    <thead>
+                        <tr>
+                            {% if has_options %}
+                                <th width="20%" class="text-center">판매 시각</th>
+                                <th width="20%" class="text-center">판매 가격</th>
+                                <th width="60%" class="text-left">상세 옵션</th>
+                            {% else %}
+                                <th width="25%" class="text-center">판매 시각</th>
+                                <th width="25%" class="text-center">개당 가격</th>
+                                <th width="30%" class="text-center">총 가격</th>
+                                <th width="20%" class="text-center">수량</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in sales_history %}
+                        <tr>
+                            {% if has_options %}
+                                <td class="text-center time-text">{{ log.ended_at|date:"y-m-d H:i" }}</td>
+                                
+                                <td class="text-center num-text bold">{{ log.price|intcomma }} <span>G</span></td>
+                                
+                                <td class="text-left option-cell">
+                                    {% if log.parsed_options and log.parsed_options|length > 0 %}
+                                        {% for line in log.parsed_options %}
+                                            <div class="option-row">
+                                                {{ line.text }}
+                                                
+                                                {% if line.color_css %}
+                                                    <span class="color-dot" style="background-color: {{ line.color_css }};" title="색상 미리보기"></span>
+                                                {% endif %}
+                                            </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <span class="no-opt" style="color:#ccc; font-size:12px;">(세부 옵션 없음)</span>
+                                    {% endif %}
+                                </td>
 
-            <div id="tab-history" class="tab-content hidden">
-                <div style="text-align: center; color: #888; padding: 60px;">
-                    <p>거래 완료 내역 데이터를 불러오는 중입니다...</p>
-                    <small>(현재는 실시간 매물 데이터 기반 차트만 제공됩니다)</small>
-                </div>
+                            {% else %}
+                                <td class="text-center time-text">{{ log.ended_at|date:"y-m-d H:i" }}</td>
+                                <td class="text-center num-text bold">{{ log.price|intcomma }} <span>G</span></td>
+                                <td class="text-center num-text sub-price">
+                                    {% widthratio log.price 1 log.item_count as t %}{{ t|intcomma }} <span>G</span>
+                                </td>
+                                <td class="text-center num-text">{{ log.item_count|intcomma }}</td>
+                            {% endif %}
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="empty-row">최근 판매 기록이 없습니다.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-        </main>
-    </div>
+        </section>
+    </main>
 
-    <script>
-        function switchTab(type) {
-            document.getElementById('tab-sale').classList.add('hidden');
-            document.getElementById('tab-history').classList.add('hidden');
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById('tab-' + type).classList.remove('hidden');
-            event.currentTarget.classList.add('active');
-        }
+    <aside class="sidebar-right detail-sidebar">
+        <div class="card filter-card sticky-top">
+            <div class="filter-header">
+                <h3><i class="ph ph-sliders"></i> 세부 옵션 검색</h3>
+            </div>
 
-        const ctx = document.getElementById('priceTimeChart').getContext('2d');
-        const labels = [{% for l in listings %}"{{ l.display_time }}",{% endfor %}];
-        const prices = [{% for l in listings %}{{ l.raw_price }},{% endfor %}];
+            <div class="filter-body">
+                {% if has_options %}
+                    
+                    <div class="filter-controller">
+                        <div class="controller-inner">
+                            <select id="detailFilterSelect" class="filter-select">
+                                <option value="" disabled selected> 세부 옵션을 선택하세요.</option>
+                                </select>
+                        </div>
+                    </div>
 
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Gold',
-                    data: prices,
-                    borderColor: '#d32f2f',
-                    backgroundColor: 'rgba(211, 47, 47, 0.05)',
-                    borderWidth: 3,
-                    tension: 0.3,
-                    pointRadius: 4,
-                    pointBackgroundColor: '#fff',
-                    pointBorderWidth: 2,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                        callbacks: {
-                            label: function(tooltipItem) {
-                                return '가격: ' + tooltipItem.raw.toLocaleString() + ' G';
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        title: { display: true, text: '등록 시간 경향 (남은 시간 기준)', color: '#999' },
-                        grid: { display: false }
-                    },
-                    y: {
-                        beginAtZero: false,
-                        title: { display: true, text: '개당 가격 (Gold)', color: '#999' },
-                        ticks: {
-                            callback: function(value) {
-                                return value.toLocaleString();
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    </script>
+                    <div id="detailActiveFilters" class="active-filters-list">
+                        </div>
+
+                    <div class="filter-actions" style="margin-top: 15px;">
+                        <button type="button" class="btn-apply" disabled>조건 적용</button>
+                        <button type="button" class="btn-reset" id="resetFilters">초기화</button>
+                    </div>
+
+                {% else %}
+                    <div class="no-filter-msg">
+                        <i class="ph ph-prohibit" style="font-size: 32px; margin-bottom: 8px;"></i>
+                        <p>옵션 검색이 불가능한 아이템입니다.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </aside>
+
+</div>
+
+<script>
+    window.ITEM_CHART_DATA = {
+        // 값이 없으면 빈 배열 [] 이라도 출력하도록 default 필터 추가
+        dates: {{ chart_data.dates|default:"[]"|safe }},
+        timestamps: {{ chart_data.timestamps|default:"[]"|safe }},
+        
+        regAvg: {{ chart_data.reg_avg|default:"[]"|safe }},
+        regMin: {{ chart_data.reg_min|default:"[]"|safe }},
+        regMax: {{ chart_data.reg_max|default:"[]"|safe }},
+        regCount: {{ chart_data.reg_count|default:"[]"|safe }},
+        
+        soldAvg: {{ chart_data.sold_avg|default:"[]"|safe }},
+        soldMin: {{ chart_data.sold_min|default:"[]"|safe }},
+        soldMax: {{ chart_data.sold_max|default:"[]"|safe }},
+        soldCount: {{ chart_data.sold_count|default:"[]"|safe }}
+    };
+</script>
+{% include 'footer.html' %}
 </body>
 </html>

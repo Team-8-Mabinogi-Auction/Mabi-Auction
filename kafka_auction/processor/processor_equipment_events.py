@@ -18,7 +18,7 @@ logger = logging.getLogger("AuctionProcessor")
 # 설정
 KAFKA_BOOTSTRAP_SERVERS = [require_env("KAFKA_BROKER")]
 
-TOPIC_RAW_LISTINGS = require_env("KAFKA_TOPIC_RAW_LISTINGS")
+TOPIC_RAW_LISTINGS_EQUIPMENTS = require_env("KAFKA_TOPIC_LISTINGS_EQUIPMENTS")
 TOPIC_RAW_HISTORY = require_env("KAFKA_TOPIC_RAW_HISTORY")
 TOPIC_EVENTS = require_env("KAFKA_TOPIC_EVENTS")
 
@@ -67,7 +67,7 @@ consumer = KafkaConsumer(
     group_id=require_env('KAFKA_PROCESSOR_EVENTS_GROUP_ID'), 
     auto_offset_reset='latest'
 )
-consumer.subscribe([TOPIC_RAW_LISTINGS, TOPIC_RAW_HISTORY])
+consumer.subscribe([TOPIC_RAW_LISTINGS_EQUIPMENTS, TOPIC_RAW_HISTORY])
 
 # 프로세서 시작 시간 기록
 BOOT_TIMESTAMP = time.time()
@@ -410,7 +410,7 @@ try:
             for tp, messages in msg_pack.items():
                 for message in messages:
                     
-                    if tp.topic == TOPIC_RAW_LISTINGS:
+                    if tp.topic == TOPIC_RAW_LISTINGS_EQUIPMENTS:
                         process_listing_message(message.value)
                         
                     elif tp.topic == TOPIC_RAW_HISTORY:

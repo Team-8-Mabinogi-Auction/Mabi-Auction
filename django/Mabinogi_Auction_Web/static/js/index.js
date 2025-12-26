@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 1. 상세 검색(동적 필터) 시스템 초기화
     initDynamicFilters();
+    initModalSystem();
     
     // 2. 서버에서 렌더링된 상태 업데이트 (총 개수 등)
     // Django 템플릿에서 이미 렌더링했으므로 JS가 덮어쓰지 않도록 합니다.
@@ -207,3 +208,106 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 });
+
+/* ==========================================================================
+   [추가] Modal Popup System Function
+   ========================================================================== */
+function initModalSystem() {
+    const modal = document.getElementById('optionModal');
+    // 모달 요소가 없으면 실행 중단 (오류 방지)
+    if (!modal) return;
+
+    const closeBtn = document.querySelector('.btn-close-modal');
+    const modalImg = document.getElementById('modalImg');
+    const modalName = document.getElementById('modalItemName');
+    const modalCat = document.getElementById('modalCategory');
+    const modalList = document.getElementById('modalOptionList');
+
+    // 1. 닫기 버튼 이벤트
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+    }
+
+    // 2. 배경 클릭 시 닫기
+    window.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.style.display = 'none';
+        }
+    });
+
+    // 3. 옵션 보기 버튼 클릭 (이벤트 위임 사용)
+    document.body.addEventListener('click', (e) => {
+        // 클릭된 요소가 .btn-open-modal 이거나 그 내부 요소인지 확인
+        const btn = e.target.closest('.btn-open-modal');
+        if (!btn) return;
+
+        // 데이터셋 가져오기
+        const name = btn.dataset.name;
+        const imgSrc = btn.dataset.img;
+        const category = btn.dataset.category;
+        const rawOptions = btn.dataset.options;
+
+        // 모달 기본 정보 채우기
+        modalName.textContent = name;
+        modalCat.textContent = category;
+        
+        // 이미지 처리
+        modalImg.src = imgSrc;
+        modalImg.style.display = 'block';
+        if(modalImg.nextElementSibling) {
+             modalImg.nextElementSibling.style.display = 'none';
+        }
+
+        // 옵션 리스트 초기화
+        modalList.innerHTML = ''; 
+        
+        try {
+            // JSON 문자열 파싱
+            const options = JSON.parse(rawOptions);
+
+            if (!options || options.length === 0) {
+                modalList.innerHTML = '<li style="justify-content:center; color:#ccc;">옵션 정보가 없습니다.</li>';
+            } else {
+                options.forEach(opt => {
+                    const li = document.createElement('li');
+                    
+                    const type = opt.option_type || '';
+                    const sub = opt.option_sub_type || '';
+                    const val1 = opt.option_value || '';
+                    const val2 = opt.option_value2 || '';
+                    
+                    // 텍스트 조합
+                    let text = ``;
+                    if(type) text += `<strong>[${type}]</strong> `;
+                    if(sub) text += `${sub} `;
+                    text += `<span style="color:#4b5563">${val1}</span>`;
+                    if(val2) text += ` (${val2})`;
+
+                    // [색상 박스 생성 로직]
+                    let colorBox = '';
+                    // '색'이라는 단어가 있고 값이 R,G,B 형태면 박스 생성
+                    if ((type.includes('색') || sub.includes('색')) && val1.includes(',')) {
+                        const parts = val1.split(',');
+                        if (parts.length >= 3) {
+                            const r = parts[0].trim();
+                            const g = parts[1].trim();
+                            const b = parts[2].trim();
+                            colorBox = `<span class="opt-color-preview" style="background: rgb(${r},${g},${b});" title="R:${r} G:${g} B:${b}"></span>`;
+                        }
+                    }
+
+                    li.innerHTML = `<span>${text}</span> ${colorBox}`;
+                    modalList.appendChild(li);
+                });
+            }
+        } catch (err) {
+            console.error('JSON Parse Error:', err);
+            modalList.innerHTML = '<li style="color:red">옵션 데이터를 불러오는데 실패했습니다.</li>';
+        }
+
+        // 모달 표시
+        modal.style.display = 'flex';
+    });
+}

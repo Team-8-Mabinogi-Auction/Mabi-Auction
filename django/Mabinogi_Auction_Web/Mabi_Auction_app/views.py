@@ -209,13 +209,21 @@ def index(request):
                 elif row.start_time:
                      display_time = row.start_time.strftime('%Y-%m-%d %H:%M')
 
+                # [수정] 옵션 데이터를 JSON 문자열로 변환 (JS에서 파싱하기 위함)
+                options_json = '[]'
+                if row.options:
+                    if isinstance(row.options, str):
+                        options_json = row.options
+                    else:
+                        options_json = json.dumps(row.options)
+
                 all_items.append({
                     'name': row.item_display_name,
                     'category': row.item_category or '기타',
                     'count': row.item_count,
                     'unit_price': row.price,
                     'total_price': row.price * row.item_count,
-                    'options': row.options,
+                    'options': options_json, # JSON String 전달
                     'display_time': display_time,
                     'sort_val': sort_val,
                     'display_img': f"{CDN_BASE_URL}thumbnail_images/{encoded_filename}",
@@ -238,7 +246,16 @@ def index(request):
                     category = row.get('item_category') or row.get('category') or '기타'
                     unit_price = int(row.get('price_per_unit') or 0)
                     count = int(row.get('item_count') or 0)
-                    options = row.get('item_option')
+                    
+                    # [수정] Redis 옵션 데이터 처리
+                    options_raw = row.get('item_option')
+                    options_json = '[]'
+                    if options_raw:
+                        if isinstance(options_raw, str):
+                            options_json = options_raw
+                        else:
+                            options_json = json.dumps(options_raw)
+
                     expire_str = row.get('expire_time')
                     
                     display_time = "정보없음"
@@ -267,7 +284,7 @@ def index(request):
                         'count': count,
                         'unit_price': unit_price,
                         'total_price': unit_price * count,
-                        'options': options,
+                        'options': options_json, # JSON String 전달
                         'display_time': display_time,
                         'sort_val': sort_val,
                         'display_img': f"{CDN_BASE_URL}thumbnail_images/{encoded_filename}",

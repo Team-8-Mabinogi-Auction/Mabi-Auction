@@ -4,23 +4,27 @@ import redis
 import logging
 from kafka import KafkaConsumer, KafkaProducer
 from datetime import datetime, timedelta, timezone
-from utils import convert_utc_to_kst, calculate_start_time, is_first_batch_ambiguous
+import os
+from utils import convert_utc_to_kst, calculate_start_time, is_first_batch_ambiguous, require_env
 
 # 로깅 설정
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.INsFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 logger = logging.getLogger("AuctionProcessor")
 
 # 설정
-KAFKA_BOOTSTRAP_SERVERS = ['localhost:9092']
-REDIS_HOST = 'localhost'
+KAFKA_BOOTSTRAP_SERVERS = [require_env("KAFKA_BROKER")]
 
-TOPIC_RAW_LISTINGS = 'auction.raw.listings.equipments' 
-TOPIC_RAW_HISTORY = 'auction.raw.history'   
-TOPIC_EVENTS = 'auction.events'   
+TOPIC_RAW_LISTINGS_EQUIPMENTS = require_env("KAFKA_TOPIC_LISTINGS_EQUIPMENTS")
+TOPIC_RAW_HISTORY = require_env("KAFKA_TOPIC_RAW_HISTORY")
+TOPIC_EVENTS = require_env("KAFKA_TOPIC_EVENTS")
+
+REDIS_HOST = require_env("REDIS_HOST")
+REDIS_PORT = int(require_env("REDIS_PORT"))
+REDIS_DB = int(os.getenv("REDIS_DB", 0))
 
 # Redis Keys
 KEY_LISTINGS_ACTIVE = 'listings:active'          
@@ -38,15 +42,21 @@ KEY_RECENT_ITEMS = 'recent:items'
 KEY_STATUS_LAST_UPDATE = 'status:last_cycle_time'
 
 # Time Constants
-PROCESSED_TTL = 600       
-PENDING_GRACE_PERIOD = 600 
-GHOST_TTL_SECONDS = 400  
-HISTORY_DEDUP_TTL = 3660 
-WARMUP_DURATION = 300    # 서버 가동 후 첫 데이터 처리 기간 (5분)
+PROCESSED_TTL = int(os.getenv("PROCESSED_TTL", 600))
+PENDING_GRACE_PERIOD = int(os.getenv("PENDING_GRACE_PERIOD", 600))
+GHOST_TTL_SECONDS = int(os.getenv("GHOST_TTL_SECONDS", 400))
+HISTORY_DEDUP_TTL = int(os.getenv("HISTORY_DEDUP_TTL", 3660))
+WARMUP_DURATION = int(os.getenv("WARMUP_DURATION", 300))   # 서버 가동 후 첫 데이터 처리 기간 (5분)
 KST = timezone(timedelta(hours=9))
 
 # 초기화
-redis_client = redis.Redis(host=REDIS_HOST, port=6379, db=0, decode_responses=True)
+redis_client = redis.Redis(
+    host=REDIS_HOST,
+    port=REDIS_PORT,
+    db=REDIS_DB,
+    decode_responses=True
+)
+
 producer = KafkaProducer(
     bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
     value_serializer=lambda v: json.dumps(v).encode('utf-8')
@@ -54,10 +64,10 @@ producer = KafkaProducer(
 consumer = KafkaConsumer(
     bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
     value_deserializer=lambda m: json.loads(m.decode('utf-8')),
-    group_id='processor-group-final-ghost-buffer-v1', 
+    group_id=require_env('KAFKA_PROCESSOR_EVENTS_GROUP_ID'), 
     auto_offset_reset='latest'
 )
-consumer.subscribe([TOPIC_RAW_LISTINGS, TOPIC_RAW_HISTORY])
+consumer.subscribe([TOPIC_RAW_LISTINGS_EQUIPMENTS, TOPIC_RAW_HISTORY])
 
 # 프로세서 시작 시간 기록
 BOOT_TIMESTAMP = time.time()
@@ -400,7 +410,7 @@ try:
             for tp, messages in msg_pack.items():
                 for message in messages:
                     
-                    if tp.topic == TOPIC_RAW_LISTINGS:
+                    if tp.topic == TOPIC_RAW_LISTINGS_EQUIPMENTS:
                         process_listing_message(message.value)
                         
                     elif tp.topic == TOPIC_RAW_HISTORY:

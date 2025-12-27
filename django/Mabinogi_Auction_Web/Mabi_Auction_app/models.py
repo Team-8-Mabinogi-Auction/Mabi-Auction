@@ -15,7 +15,7 @@ class CurrentListings(models.Model):
     created_at = models.DateTimeField()                         # 데이터 호출 시각
 
     class Meta:
-        db_table = '"mabi_auction"."current_listings"'
+        db_table = '"mabi_raw"."current_listings"'
         managed = False
 
 
@@ -41,7 +41,7 @@ class ItemStaticInfo(models.Model):
 
     class Meta:
         managed = False  # Django가 테이블을 생성/수정하지 않음
-        db_table = '"mabi_auction"."item_info"' # 스키마.테이블명
+        db_table = '"mabi_raw"."item_info"' # 스키마.테이블명
 
 
 # 2. 아이템 시간별 시세 통계 (차트용)
@@ -85,4 +85,4 @@ class AuctionLog(models.Model):
 
     class Meta:
         managed = False
-        db_table = '"mabi_auction"."auction_logs"'
+        db_table = '"mabi_raw"."auction_logs"'

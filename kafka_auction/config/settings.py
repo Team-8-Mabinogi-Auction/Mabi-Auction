@@ -22,16 +22,16 @@ AUCTION_HISTORY_URL = os.getenv(
 # Kafka 설정
 # ─────────────────────────────
 KAFKA_BOOTSTRAP_SERVERS = os.getenv(
-    "KAFKA_BOOTSTRAP_SERVERS",
+    "KAFKA_BROKER",
 
 # AWS EC2(도커 내부망) 환경에서는 기본 9092 포트를 사용합니다.
 # 로컬 맥북에서 도커 외부 Producer로 테스트할 경우 'localhost:9094'로 수정하여 사용하세요.
     "localhost:9092" 
 )
 
-TOPIC_LISTINGS_EQUIPMENTS = os.getenv("TOPIC_LISTINGS", "auction.raw.listings.equipments")
-TOPIC_LISTINGS_CONSUMABLE = os.getenv("TOPIC_LISTINGS_CONSUMABLE", "auction.raw.listings.consumables")
-TOPIC_HISTORY = os.getenv("TOPIC_HISTORY", "auction.raw.history")
+TOPIC_LISTINGS_EQUIPMENTS = os.getenv("KAFKA_TOPIC_LISTINGS_EQUIPMENTS", "auction.raw.listings.equipments")
+TOPIC_LISTINGS_CONSUMABLE = os.getenv("KAFKA_TOPIC_LISTINGS_CONSUMABLE", "auction.raw.listings.consumables")
+TOPIC_HISTORY = os.getenv("KAFKA_TOPIC_RAW_HISTORY", "auction.raw.history")
 
 # ─────────────────────────────
 # 로깅

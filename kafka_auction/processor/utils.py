@@ -2,6 +2,10 @@ import hashlib
 import json
 from typing import Any, Dict, List, Tuple
 from datetime import datetime, timedelta, timezone
+import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 # KST 타임존 설정
 KST = timezone(timedelta(hours=9))
@@ -154,3 +158,10 @@ def is_first_batch_ambiguous(hours_left: float, margin_minutes: float = 2.0) -> 
 
     # 그 외 구간 (6~12, 12~24 등) -> 확실함
     return False
+
+def require_env(key: str) -> str:
+    value = os.getenv(key)
+    if value is None or value == "":
+        logger.critical(f"Required environment variable '{key}' is missing")
+        raise RuntimeError(f"Required environment variable '{key}' is missing")
+    return value

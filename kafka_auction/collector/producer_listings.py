@@ -56,7 +56,7 @@ def fetch_listings_page(
     return items, next_cursor
 
 
-def run_listings_cycle(category: str = None) -> None:
+def run_listings_cycle(category: str, cycle_id: str) -> None:
     """
     '한 번의 호출 주기'에 해당하는 전체 수집 사이클.
 
@@ -66,11 +66,11 @@ def run_listings_cycle(category: str = None) -> None:
     
     Args:
         category: 처리할 카테고리 
+        cycle_id: 전체 카테고리 공통 사이클 식별자(END_OF_CYCLE과 동일한 값)
     """
-    # 주기 시작 시각
+    # 카테고리별 실행 시간 측정용(END_OF_CYCLE 발행 기준과는 별개)
     KST = timezone(timedelta(hours=9))
-    cycle_started_at_dt = datetime.now(KST)
-    cycle_started_at = cycle_started_at_dt.isoformat()
+    category_started_at_dt = datetime.now(KST)
 
     auction_item_category = category 
     # auction_item_category = ""  # 전체 데이터 가져올 때 공란으로 사용
@@ -78,7 +78,7 @@ def run_listings_cycle(category: str = None) -> None:
     logger.info(
         "Starting listings cycle for category='%s', cycle_id=%s",
         auction_item_category,
-        cycle_started_at,
+        cycle_id,
     )
 
     cursor = ""
@@ -119,7 +119,7 @@ def run_listings_cycle(category: str = None) -> None:
 
             event = {
                 "type": "LISTING",
-                "cycle_id": cycle_started_at,
+                "cycle_id": cycle_id,
                 "item_id" : full_signature,
                 "match_id": match_signature,
                 "raw": item,
@@ -137,26 +137,14 @@ def run_listings_cycle(category: str = None) -> None:
 
         cursor = next_cursor
 
-    # 사이클 종료 컨트롤 메시지
-    end_event = {
-        "type": "END_OF_CYCLE",
-        "cycle_id": cycle_started_at,
-    }
-
-    send_message(
-        topic=TOPIC_LISTINGS_EQUIPMENTS,
-        value=end_event,
-        flush=True,
-    )
-
-    # 사이클 종료 시각 및 경과 시간 계산
-    cycle_ended_at_dt = datetime.now(KST)
-    elapsed_time = cycle_ended_at_dt - cycle_started_at_dt
+    # 카테고리 종료 시각 및 경과 시간 계산
+    category_ended_at_dt = datetime.now(KST)
+    elapsed_time = category_ended_at_dt - category_started_at_dt
     elapsed_seconds = elapsed_time.total_seconds()
 
     logger.info(
         "Listings cycle finished. cycle_id=%s, total_items_cnt=%d, page_cnt=%d, elapsed_time=%.2f seconds (%.2f minutes)",
-        cycle_started_at,
+        cycle_id,
         items_cnt,
         cursor_cnt,
         elapsed_seconds,
@@ -174,14 +162,28 @@ if __name__ == "__main__":
                 logger.info(">>> Waiting for 3 minutes (180 seconds) before next cycle...")
                 time.sleep(180)
             
-            logger.info(f">>> Execution Start (Cycle {cycle_count})")
+            # 전체 카테고리 공통 cycle_id (END_OF_CYCLE과 동일하게 사용)
+            KST = timezone(timedelta(hours=9))
+            cycle_id = datetime.now(KST).isoformat()
+            logger.info(f">>> Execution Start (Cycle {cycle_count}), cycle_id={cycle_id}")
             
             # 장비 카테고리 목록을 루프로 돌면서 각 카테고리별로 사이클 실행
             for category in EQUIPMENT_CATEGORIES:
                 logger.info(f">>> Processing category: '{category}'")
-                run_listings_cycle(category=category)
+                run_listings_cycle(category=category, cycle_id=cycle_id)
                 logger.info(f">>> Category '{category}' completed")
             
+            # 모든 카테고리 완료 후 END_OF_CYCLE 1회 발행
+            end_event = {
+                "type": "END_OF_CYCLE",
+                "cycle_id": cycle_id,
+            }
+            send_message(
+                topic=TOPIC_LISTINGS_EQUIPMENTS,
+                value=end_event,
+                flush=True,
+            )
+
             logger.info(f">>> All equipment categories completed for Cycle {cycle_count}")
             
     except KeyboardInterrupt:

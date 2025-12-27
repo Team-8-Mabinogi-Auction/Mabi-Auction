@@ -5,7 +5,7 @@ import logging
 from kafka import KafkaConsumer, KafkaProducer
 from datetime import datetime, timedelta, timezone
 import os
-from utils import convert_utc_to_kst, calculate_start_time, is_first_batch_ambiguous, require_env
+from kafka_auction.processor.utils import convert_utc_to_kst, calculate_start_time, is_first_batch_ambiguous, require_env
 
 # 로깅 설정
 logging.basicConfig(

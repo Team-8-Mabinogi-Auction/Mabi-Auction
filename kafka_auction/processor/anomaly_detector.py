@@ -7,7 +7,7 @@ from window_buffer import WindowBuffer
 import logging
 import sys
 import os
-from utils import require_env
+from kafka_auction.processor.utils import require_env
 
 # 설정
 KAFKA_BROKER = require_env("KAFKA_BROKER")

@@ -6,7 +6,7 @@ from kafka import KafkaConsumer
 from psycopg2.extras import execute_batch, RealDictCursor, Json # [수정] Json 추가
 from datetime import datetime, timezone, timedelta
 import os
-from processor.utils import require_env
+from kafka_auction.processor.utils import require_env
 
 # 로깅 설정
 logging.basicConfig(

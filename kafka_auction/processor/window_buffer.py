@@ -1,7 +1,7 @@
 import redis
 import json
 import os
-from utils import require_env
+from kafka_auction.processor.utils import require_env
 
 # Redis 접속 정보 및 윈도우 설정
 REDIS_CONFIG = {
@@ -14,7 +14,8 @@ REDIS_CONFIG = {
 WINDOW_SETTINGS = {
     'SOLD_SEC': os.getenv('SOLD_WINDOW_SEC', 600, int),
     'REG_SEC': os.getenv('REG_WINDOW_SEC', 300, int),
-    'REGISTER_GRACE_SEC': os.getenv('REGISTER_GRACE_SEC', 30, int)
+    'REGISTER_GRACE_SEC': os.getenv('REGISTER_GRACE_SEC', 30, int),
+    'CAUTION_TTL_SEC': os.getenv('CAUTION_TTL_SEC', 3600, int)
 }
 
 class WindowBuffer:
@@ -29,6 +30,7 @@ class WindowBuffer:
         self.SOLD_WINDOW_SEC = WINDOW_SETTINGS['SOLD_SEC']
         self.REG_WINDOW_SEC = WINDOW_SETTINGS['REG_SEC']
         self.REGISTER_GRACE_SEC = WINDOW_SETTINGS['REGISTER_GRACE_SEC']
+        self.CAUTION_TTL_SEC = WINDOW_SETTINGS['CAUTION_TTL_SEC']
 
         # 판매 이벤트 추가 + 실시간 평균가 계산
         # 데이터 추가 -> 만료 삭제 -> 현재 윈도우 내 평균가 및 판매량 리턴
@@ -196,10 +198,16 @@ class WindowBuffer:
             print(f"Redis Cache Error: {e}")
 
     def add_alert_caution(self, item_name):
-        self.r.sadd("alert:caution", item_name)
+        """주의 상태 설정 (TTL 적용으로 자동 해제)"""
+        key = f"state:caution:{item_name}"
+        # 값이 무엇인지는 중요하지 않음, 키의 존재 여부가 중요
+        self.r.set(key, "1", ex=self.CAUTION_TTL_SEC)
 
+    # [수정] 주의 상태 확인: sismember -> exists
     def is_in_caution(self, item_name):
-        return self.r.sismember("alert:caution", item_name)
+        """주의 상태 확인"""
+        key = f"state:caution:{item_name}"
+        return self.r.exists(key) > 0
     
     def add_alert_warning(self, item_name):
         self.r.sadd("alert:warning", item_name)

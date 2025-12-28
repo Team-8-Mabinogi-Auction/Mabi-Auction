@@ -22,6 +22,8 @@ DB_CONFIG = {
     "password": require_env("DB_PASSWORD"),
     "port": int(require_env("DB_PORT")),
 }
+
+# 이상 탐지 설정 변경 사항
 DETECTOR_CONFIG = {
     "SWEEPING_RATIO": float(os.getenv("SWEEPING_RATIO", 0.1)),                  # 매점 판단 비율
     "MANIPULATION_RATIO": float(os.getenv("MANIPULATION_RATIO", 0.1)),          # 매석 판단 비율

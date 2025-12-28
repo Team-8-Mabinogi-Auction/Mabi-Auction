@@ -49,7 +49,7 @@ HISTORY_DEDUP_TTL = int(os.getenv("HISTORY_DEDUP_TTL", 3660))
 WARMUP_DURATION = int(os.getenv("WARMUP_DURATION", 300))   # 서버 가동 후 첫 데이터 처리 기간 (5분)
 KST = timezone(timedelta(hours=9))
 
-# 초기화
+# 초기화 변경사항
 REDIS_URL = os.getenv("REDIS_HOST") # env에 이미 rediss://... 전체 주소가 있으므로
 redis_client = redis.from_url(
     REDIS_URL, 

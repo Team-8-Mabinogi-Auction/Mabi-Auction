@@ -19,7 +19,7 @@ def _read_sql(name: str) -> str:
 
 with DAG(
     dag_id="mabi_item_display_hourly_stats",
-    description="Hourly aggregates (per item_display_name) from mabi_auction.auction_logs into mabi_analytics schema",
+    description="Hourly aggregates (per item_display_name) from mabi_raw.auction_logs into mabi_analytics schema",
     schedule="@hourly",
     start_date=pendulum.datetime(2025, 1, 1, tz="UTC"),
     catchup=False,

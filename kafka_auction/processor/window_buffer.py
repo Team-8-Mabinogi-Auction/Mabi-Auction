@@ -12,10 +12,10 @@ REDIS_CONFIG = {
 }
 
 WINDOW_SETTINGS = {
-    'SOLD_SEC': os.getenv('SOLD_WINDOW_SEC', 600, int),
-    'REG_SEC': os.getenv('REG_WINDOW_SEC', 300, int),
-    'REGISTER_GRACE_SEC': os.getenv('REGISTER_GRACE_SEC', 30, int),
-    'CAUTION_TTL_SEC': os.getenv('CAUTION_TTL_SEC', 3600, int)
+    'SOLD_SEC': int(os.getenv('SOLD_WINDOW_SEC', 600)),
+    'REG_SEC': int(os.getenv('REG_WINDOW_SEC', 300)),
+    'REGISTER_GRACE_SEC': int(os.getenv('REGISTER_GRACE_SEC', 30)),
+    'CAUTION_TTL_SEC': int(os.getenv('CAUTION_TTL_SEC', 3600))
 }
 
 class WindowBuffer:

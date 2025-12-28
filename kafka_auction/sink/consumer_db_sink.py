@@ -29,8 +29,8 @@ DB_CONFIG = {
     'port': int(require_env("DB_PORT")),
 }
 
-BATCH_SIZE = os.getenv("DB_SINK_BATCH_SIZE", 500, int)
-FLUSH_INTERVAL = os.getenv("DB_SINK_FLUSH_INTERVAL", 1.0, float)
+BATCH_SIZE = int(os.getenv("DB_SINK_BATCH_SIZE", 500))
+FLUSH_INTERVAL = float(os.getenv("DB_SINK_FLUSH_INTERVAL", 1.0))
 KST = timezone(timedelta(hours=9))
 
 class AuctionDbSink:

@@ -41,7 +41,8 @@ logger = logging.getLogger("AnomalyDetector")
 # KST 타임존
 KST = timezone(timedelta(hours=9))
 
-WARMUP_DURATION = os.getenv("WARMUP_DURATION", 600)
+# 문자열을 정수로 명시적 형변환
+WARMUP_DURATION = int(os.getenv("WARMUP_DURATION", 600))
 
 class DBHandler:
     """

@@ -28,6 +28,7 @@ producer = KafkaProducer(
     bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS.split(","),
     value_serializer=_value_serializer,
     key_serializer=_key_serializer,
+    compression_type='lz4',
     acks="all",
     linger_ms=10,
     retries=5,

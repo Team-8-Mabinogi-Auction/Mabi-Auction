@@ -59,7 +59,8 @@ redis_client = redis.Redis(
 
 producer = KafkaProducer(
     bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
-    value_serializer=lambda v: json.dumps(v).encode('utf-8')
+    value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+    compression_type='lz4'
 )
 consumer = KafkaConsumer(
     bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,

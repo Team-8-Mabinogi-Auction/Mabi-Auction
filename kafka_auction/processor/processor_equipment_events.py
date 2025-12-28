@@ -97,7 +97,7 @@ def emit_event(event_type, item_id, match_id=None, listing_data=None, history_da
         'event_type': event_type,
         'item_id': item_id,       # Unique Signature
         'match_id': match_id,     # Match Signature
-        'processed_at': datetime.now().isoformat(),
+        'processed_at': datetime.now(KST).isoformat(),
         'event_time': event_time,
         'payload': {
             'skip_anomaly_detection': skip_anomaly # 이상탐지 건너뛰기 여부

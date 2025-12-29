@@ -64,10 +64,9 @@ WARMUP_DURATION = int(os.getenv("WARMUP_DURATION", 300))   # 서버 가동 후 �
 KST = timezone(timedelta(hours=9))
 
 # 초기화
-redis_client = redis.Redis(
-    host=REDIS_HOST,
-    port=REDIS_PORT,
-    db=REDIS_DB,
+REDIS_URL = os.getenv("REDIS_HOST") # env에 이미 rediss://... 전체 주소가 있으므로
+redis_client = redis.from_url(
+    REDIS_URL, 
     decode_responses=True
 )
 

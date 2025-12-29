@@ -3,11 +3,16 @@ import time
 from datetime import datetime, timezone, timedelta
 import psycopg2 
 from kafka import KafkaConsumer, KafkaProducer
-from window_buffer import WindowBuffer
+from kafka_auction.processor.window_buffer import WindowBuffer
 import logging
 import sys
 import os
 from kafka_auction.processor.utils import require_env
+from pathlib import Path
+from dotenv import load_dotenv
+
+current_file = Path(__file__).resolve() 
+env_path = current_file.parent.parent / 'config' / '.env'
 
 # 설정
 KAFKA_BROKER = require_env("KAFKA_BROKER")
@@ -38,10 +43,20 @@ logging.basicConfig(
 )
 logger = logging.getLogger("AnomalyDetector")
 
+# 환경변수 설정
+current_file = Path(__file__).resolve() 
+env_path = current_file.parent.parent / 'config' / '.env'
+
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path)
+    logger.info(f"Loaded environment variables from {env_path}")
+else:
+    logger.error(f"Cannot find .env file at {env_path}")
+
 # KST 타임존
 KST = timezone(timedelta(hours=9))
 
-WARMUP_DURATION = os.getenv("WARMUP_DURATION", 600)
+WARMUP_DURATION = int(os.getenv("WARMUP_DURATION", 600))
 
 class DBHandler:
     """

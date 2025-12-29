@@ -154,7 +154,7 @@ if __name__ == "__main__":
             cycle_count += 1
             if cycle_count > 1:
                 logger.info(">>> Waiting for 3 minutes (180 seconds) before next cycle...")
-                time.sleep(180)
+                time.sleep(210)
 
             cycle_id = datetime.now(timezone.utc).isoformat()
             logger.info(f">>> Execution Start (Cycle {cycle_count}), cycle_id={cycle_id}")
@@ -184,5 +184,3 @@ if __name__ == "__main__":
         producer.flush()
         producer.close()
         logger.info("Producer resources closed. Program terminated.")
-
-

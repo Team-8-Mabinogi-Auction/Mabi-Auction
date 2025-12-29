@@ -160,7 +160,7 @@ if __name__ == "__main__":
             if cycle_count > 1:
                 # 2회차부터는 3분 대기
                 logger.info(">>> Waiting for 3 minutes (180 seconds) before next cycle...")
-                time.sleep(180)
+                time.sleep(210)
             
             # 전체 카테고리 공통 cycle_id (END_OF_CYCLE과 동일하게 사용)
             KST = timezone(timedelta(hours=9))

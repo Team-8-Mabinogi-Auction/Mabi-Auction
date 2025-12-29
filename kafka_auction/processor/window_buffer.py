@@ -2,6 +2,28 @@ import redis
 import json
 import os
 from kafka_auction.processor.utils import require_env
+import logging
+from pathlib import Path
+from dotenv import load_dotenv
+
+# 로깅 설정
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger("AuctionProcessor")
+
+# 환경변수 설정
+current_file = Path(__file__).resolve() 
+env_path = current_file.parent.parent / 'config' / '.env'
+
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path)
+    logger.info(f"Loaded environment variables from {env_path}")
+else:
+    logger.error(f"Cannot find .env file at {env_path}")
+
 
 # Redis 접속 정보 및 윈도우 설정
 REDIS_CONFIG = {

@@ -6,6 +6,8 @@ from kafka import KafkaConsumer, KafkaProducer
 from datetime import datetime, timedelta, timezone
 import os
 from kafka_auction.processor.utils import convert_utc_to_kst, calculate_start_time, is_first_batch_ambiguous, require_env
+from pathlib import Path
+from dotenv import load_dotenv
 
 # 로깅 설정
 logging.basicConfig(
@@ -14,6 +16,18 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 logger = logging.getLogger("AuctionProcessor")
+
+# 환경변수 설정
+current_file = Path(__file__).resolve() 
+env_path = current_file.parent.parent / 'config' / '.env'
+
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path)
+    logger.info(f"Loaded environment variables from {env_path}")
+else:
+    logger.error(f"Cannot find .env file at {env_path}")
+
+
 
 # 설정
 KAFKA_BOOTSTRAP_SERVERS = [require_env("KAFKA_BROKER")]
@@ -96,7 +110,7 @@ def emit_event(event_type, item_id, match_id=None, listing_data=None, history_da
         'event_type': event_type,
         'item_id': item_id,       # Unique Signature
         'match_id': match_id,     # Match Signature
-        'processed_at': datetime.now().isoformat(),
+        'processed_at': datetime.now(KST).isoformat(),
         'event_time': event_time,
         'payload': {
             'skip_anomaly_detection': skip_anomaly # 이상탐지 건너뛰기 여부

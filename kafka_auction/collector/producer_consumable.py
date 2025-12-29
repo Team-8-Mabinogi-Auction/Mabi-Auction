@@ -55,7 +55,7 @@ def fetch_listings_page(
     return items, next_cursor
 
 
-def run_listings_cycle(category: str) -> None:
+def run_listings_cycle(category: str, cycle_id: str) -> None:
     """
     '한 번의 호출 주기'에 해당하는 전체 수집 사이클.
 
@@ -65,16 +65,16 @@ def run_listings_cycle(category: str) -> None:
 
     Args:
         category: 처리할 소비 카테고리
+        cycle_id: 전체 카테고리 공통 사이클 식별자(END_OF_CYCLE과 동일한 값)
     """
-    cycle_started_at_dt = datetime.now(timezone.utc)
-    cycle_started_at = cycle_started_at_dt.isoformat()
+    category_started_at_dt = datetime.now(timezone.utc)
 
     auction_item_category = category
 
     logger.info(
         "Starting consumables cycle for category='%s', cycle_id=%s",
         auction_item_category,
-        cycle_started_at,
+        cycle_id,
     )
 
     cursor = ""
@@ -116,7 +116,7 @@ def run_listings_cycle(category: str) -> None:
 
             event = {
                 "type": "LISTING",
-                "cycle_id": cycle_started_at,
+                "cycle_id": cycle_id,
                 "item_id": full_signature,
                 "match_id": match_signature,
                 "raw": item,
@@ -134,23 +134,12 @@ def run_listings_cycle(category: str) -> None:
 
         cursor = next_cursor
 
-    # 사이클 종료 컨트롤 메시지
-    end_event = {
-        "type": "END_OF_CYCLE",
-    }
-
-    send_message(
-        topic=TOPIC_LISTINGS_CONSUMABLE,
-        value=end_event,
-        flush=True,  # 마지막에는 flush
-    )
-
-    cycle_ended_at_dt = datetime.now(timezone.utc)
-    elapsed_seconds = (cycle_ended_at_dt - cycle_started_at_dt).total_seconds()
+    category_ended_at_dt = datetime.now(timezone.utc)
+    elapsed_seconds = (category_ended_at_dt - category_started_at_dt).total_seconds()
 
     logger.info(
         "Consumables cycle finished. cycle_id=%s, total_items_cnt=%d, page_cnt=%d, elapsed_time=%.2f seconds (%.2f minutes)",
-        cycle_started_at,
+        cycle_id,
         items_cnt,
         cursor_cnt,
         elapsed_seconds,
@@ -167,12 +156,24 @@ if __name__ == "__main__":
                 logger.info(">>> Waiting for 3 minutes (180 seconds) before next cycle...")
                 time.sleep(180)
 
-            logger.info(f">>> Execution Start (Cycle {cycle_count})")
+            cycle_id = datetime.now(timezone.utc).isoformat()
+            logger.info(f">>> Execution Start (Cycle {cycle_count}), cycle_id={cycle_id}")
 
             for category in CONSUMABLE_CATEGORIES:
                 logger.info(f">>> Processing category: '{category}'")
-                run_listings_cycle(category=category)
+                run_listings_cycle(category=category, cycle_id=cycle_id)
                 logger.info(f">>> Category '{category}' completed")
+
+            # 모든 카테고리 완료 후 END_OF_CYCLE 1회 발행
+            end_event = {
+                "type": "END_OF_CYCLE",
+                "cycle_id": cycle_id,
+            }
+            send_message(
+                topic=TOPIC_LISTINGS_CONSUMABLE,
+                value=end_event,
+                flush=True,  # 마지막에는 flush
+            )
 
             logger.info(f">>> All consumable categories completed for Cycle {cycle_count}")
 
@@ -183,5 +184,4 @@ if __name__ == "__main__":
         producer.flush()
         producer.close()
         logger.info("Producer resources closed. Program terminated.")
-
 

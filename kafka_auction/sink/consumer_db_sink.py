@@ -7,6 +7,8 @@ from psycopg2.extras import execute_batch, RealDictCursor, Json # [수정] Json 
 from datetime import datetime, timezone, timedelta
 import os
 from kafka_auction.processor.utils import require_env
+from pathlib import Path
+from dotenv import load_dotenv
 
 # 로깅 설정
 logging.basicConfig(
@@ -16,9 +18,19 @@ logging.basicConfig(
 )
 logger = logging.getLogger("AuctionDbSink")
 
+# 환경변수 설정
+current_file = Path(__file__).resolve() 
+env_path = current_file.parent.parent / 'config' / '.env'
+
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path)
+    logger.info(f"Loaded environment variables from {env_path}")
+else:
+    logger.error(f"Cannot find .env file at {env_path}")
+
 # 설정
-KAFKA_BOOTSTRAP_SERVERS = [require_env("KAFKA_BOOTSTRAP_SERVERS")]
-TOPIC_EVENTS = require_env("TOPIC_EVENTS")
+KAFKA_BOOTSTRAP_SERVERS = [require_env("KAFKA_BROKER")]
+TOPIC_EVENTS = require_env("KAFKA_TOPIC_EVENTS")
 GROUP_ID = require_env("KAFKA_DB_SINK_GROUP_ID")
 
 DB_CONFIG = {
@@ -29,8 +41,8 @@ DB_CONFIG = {
     'port': int(require_env("DB_PORT")),
 }
 
-BATCH_SIZE = os.getenv("DB_SINK_BATCH_SIZE", 500, int)
-FLUSH_INTERVAL = os.getenv("DB_SINK_FLUSH_INTERVAL", 1.0, float)
+BATCH_SIZE = int(os.getenv("DB_SINK_BATCH_SIZE", 500))
+FLUSH_INTERVAL = float(os.getenv("DB_SINK_FLUSH_INTERVAL", 1.0))
 KST = timezone(timedelta(hours=9))
 
 class AuctionDbSink:

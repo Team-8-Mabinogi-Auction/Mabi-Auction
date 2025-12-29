@@ -55,8 +55,8 @@ def run_history_cycle() -> None:
     cycle_started_at_dt = datetime.now(KST)
     cycle_started_at = cycle_started_at_dt.isoformat()
 
-    auction_item_category = "모자/가발"
-    # auction_item_category = ""  # 전체 데이터 가져올 때 공란으로 사용
+    # auction_item_category = "모자/가발"
+    auction_item_category = ""  # 전체 데이터 가져올 때 공란으로 사용
 
     logger.info(
         "Starting history cycle for category='%s', cycle_id=%s",
@@ -146,7 +146,7 @@ if __name__ == "__main__":
             if cycle_count > 1:
                 # 2회차부터는 3분 대기
                 logger.info(">>> Waiting for 3 minutes (180 seconds) before next cycle...")
-                time.sleep(180)
+                time.sleep(300)
             
             logger.info(f">>> Execution Start (Cycle {cycle_count})")
             run_history_cycle()

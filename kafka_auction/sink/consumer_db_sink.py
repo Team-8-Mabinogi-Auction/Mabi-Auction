@@ -3,14 +3,13 @@ import time
 import psycopg2
 import logging
 from kafka import KafkaConsumer
-from psycopg2.extras import execute_batch, RealDictCursor, Json # [수정] Json 추가
+from psycopg2.extras import execute_batch, RealDictCursor, Json
 from datetime import datetime, timezone, timedelta
 import os
 from kafka_auction.processor.utils import require_env
 from pathlib import Path
 from dotenv import load_dotenv
 
-# 로깅 설정
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
@@ -18,17 +17,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger("AuctionDbSink")
 
-# 환경변수 설정
 current_file = Path(__file__).resolve() 
 env_path = current_file.parent.parent / 'config' / '.env'
 
 if env_path.exists():
     load_dotenv(dotenv_path=env_path)
-    logger.info(f"Loaded environment variables from {env_path}")
 else:
     logger.error(f"Cannot find .env file at {env_path}")
 
-# 설정
 KAFKA_BOOTSTRAP_SERVERS = [require_env("KAFKA_BROKER")]
 TOPIC_EVENTS = require_env("KAFKA_TOPIC_EVENTS")
 GROUP_ID = require_env("KAFKA_DB_SINK_GROUP_ID")
@@ -77,9 +73,7 @@ class AuctionDbSink:
         self.event_buffer.append(event)
 
     def _fetch_existing_items(self, item_ids):
-        """삭제/판매 처리를 위해 기존 매물 정보를 DB에서 일괄 조회"""
         if not item_ids: return {}
-        
         items_map = {}
         try:
             with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -99,146 +93,111 @@ class AuctionDbSink:
     def flush(self):
         if not self.event_buffer: return
 
-        # 1. DB 조회 대상 식별 (SOLD, CANCEL)
         lookup_ids = set()
+        
+        # [1] KeyError 방지를 위해 .get() 사용
         for evt in self.event_buffer:
-            if evt['event_type'] in ('SOLD', 'CANCEL'):
+            e_type = evt.get('event_type')
+            if e_type in ('SOLD', 'CANCEL'):
                 target_id = evt.get('item_id') or evt.get('match_id')
                 if target_id:
                     lookup_ids.add(target_id)
         
-        # 2. DB 일괄 조회
         db_items_map = self._fetch_existing_items(lookup_ids)
 
-        # 3. 배치 데이터 준비
         batch_logs = []       
         batch_ins_list = []   
-        # batch_ins_opt = [] # [수정] 옵션 테이블 사용 안 함
         batch_del_ids = []    
 
         for evt in self.event_buffer:
+            # [2] event_type 없는 불량 메시지 스킵
             e_type = evt.get('event_type')
+            if not e_type: 
+                continue 
+
             item_id = evt.get('item_id') or evt.get('match_id')
-            payload = evt.get('payload', {})
             processed_at = self.parse_time(evt.get('processed_at'))
+            
+            # Payload 파싱
+            raw = evt.get('payload', {})
+            
+            # [Null Safety] 
+            item_name = raw.get('item_name') or 'Unknown'
+            disp_name = raw.get('item_display_name') or 'Unknown'
+            category = raw.get('auction_item_category') or 'Unknown' 
+            
+            item_count = raw.get('item_count') or 1
+            price = raw.get('auction_price_per_unit') or 0
+            
+            start_time = self.parse_time(raw.get('start_time'))
+            expire_time = self.parse_time(raw.get('date_auction_expire'))
+            duration = raw.get('auction_duration')
+            
+            if not duration and start_time and expire_time:
+                duration = int((expire_time - start_time).total_seconds() / 3600)
 
-            # REGISTER (등록)
+            options_json = raw.get('item_option') or []
+            
+            buy_id = raw.get('auction_buy_id')
+            sold_time = self.parse_time(raw.get('date_auction_buy')) or processed_at
+
             if e_type == 'REGISTER':
-                raw = payload.get('listing_data', {})
-                if not raw: continue
-
-                start_time = self.parse_time(raw.get('start_time'))
-                expire_time = self.parse_time(raw.get('date_auction_expire'))
-                duration = raw.get('auction_duration')
-                price = raw.get('auction_price_per_unit', 0)
-                
-                # [수정] 옵션 데이터를 JSONB로 저장
-                options_json = raw.get('item_option', [])
-
-                # Current Listings Insert (options 컬럼 추가)
                 batch_ins_list.append((
-                    item_id,
-                    raw.get('item_name'),
-                    raw.get('item_display_name'),
-                    raw.get('item_count', 1),
-                    raw.get('auction_item_category'),
-                    price,
-                    start_time,
-                    expire_time,
-                    duration,
-                    processed_at,
-                    Json(options_json) # [추가] JSONB
+                    item_id, item_name, disp_name, item_count, category,
+                    price, start_time, expire_time, duration, processed_at,
+                    Json(options_json)
                 ))
-
-                # Auction Log Insert (options 컬럼 추가)
+                
                 batch_logs.append((
-                    'REGISTER',
-                    item_id,
-                    None, # auction_buy_id
-                    raw.get('item_name'),
-                    raw.get('item_display_name'),
-                    raw.get('item_count', 1),
-                    raw.get('auction_item_category'),
-                    price,
-                    start_time,  # registered_at
-                    duration,
-                    expire_time, # ended_at (만료예정시각)
-                    processed_at,
-                    Json(options_json) # [추가] JSONB
+                    'REGISTER', item_id, None, item_name, disp_name, item_count, category,
+                    price, start_time, duration, expire_time, processed_at,
+                    Json(options_json)
                 ))
 
-            # SOLD (판매)
             elif e_type == 'SOLD':
-                history = payload.get('history_data', {})
                 db_item = db_items_map.get(item_id)
                 
-                # DB 데이터가 있으면 우선 사용
-                target_data = db_item if db_item else history
+                if db_item:
+                    # DB 정보 우선 (Ghost SOLD 대비)
+                    item_name = db_item.get('item_name')
+                    disp_name = db_item.get('item_display_name')
+                    category = db_item.get('item_category')
+                    start_time = db_item.get('start_time')
+                    duration = db_item.get('auction_duration')
+                    options_json = db_item.get('options', [])
+                    batch_del_ids.append((item_id,))
                 
-                name = target_data.get('item_name')
-                disp_name = target_data.get('item_display_name')
-                count = target_data.get('item_count', 1)
-                category = target_data.get('item_category') if db_item else history.get('auction_item_category')
-                
-                # DB에서 등록 정보(start_time, duration) 가져오기
-                # Ghost 매물일 경우(db_item 없음) None
-                registered_at = db_item.get('start_time') if db_item else None
-                duration = db_item.get('auction_duration') if db_item else None
-                
-                buy_id = history.get('auction_buy_id')
-                sold_price = history.get('auction_price_per_unit')
-                sold_time = self.parse_time(history.get('date_auction_buy'))
-                
-                # 판매 시점의 옵션 정보 저장
-                current_opts = target_data.get('options') if db_item else target_data.get('item_option', [])
-                
-                # Log Insert
                 batch_logs.append((
-                    'SOLD',
-                    item_id,
-                    buy_id,
-                    name,
-                    disp_name,
-                    count,
-                    category,
-                    sold_price,
-                    registered_at,
-                    duration,
-                    sold_time,      # ended_at (판매된 시간)
-                    processed_at,
-                    Json(current_opts) # [추가] JSONB
+                    'SOLD', item_id, buy_id, item_name, disp_name, item_count, category,
+                    price, start_time, duration, sold_time, processed_at,
+                    Json(options_json)
                 ))
 
-                if db_item:
-                    batch_del_ids.append((item_id,))
-
-            # CANCEL (취소)
             elif e_type == 'CANCEL':
                 db_item = db_items_map.get(item_id)
-                
                 if db_item:
+                    # [3] item_category 필드 포함 (총 13개 확인)
                     batch_logs.append((
-                        'CANCEL',
-                        item_id,
-                        None,
-                        db_item.get('item_name'),
-                        db_item.get('item_display_name'),
-                        db_item.get('item_count'),
-                        db_item.get('item_category'),
-                        db_item.get('price'),
-                        db_item.get('start_time'),        # registered_at
-                        db_item.get('auction_duration'),  # duration
-                        db_item.get('expire_time'),  # ended_at (만료 시각)
-                        processed_at,
-                        Json(db_item.get('options', [])) # [추가] JSONB
+                        'CANCEL',                           # 1
+                        item_id,                            # 2
+                        None,                               # 3
+                        db_item.get('item_name'),           # 4
+                        db_item.get('item_display_name'),   # 5
+                        item_count,                         # 6
+                        db_item.get('item_category'),       # 7
+                        db_item.get('price'),               # 8
+                        db_item.get('start_time'),          # 9
+                        db_item.get('auction_duration'),    # 10
+                        db_item.get('expire_time'),         # 11
+                        processed_at,                       # 12
+                        Json(db_item.get('options', []))    # 13
                     ))
                     batch_del_ids.append((item_id,))
 
-        # 4. DB 반영
         try:
             with self.conn.cursor() as cur:
-                # (1) Log Insert - [수정] options 컬럼 추가
                 if batch_logs:
+                    # SQL Placeholder 13개
                     sql_log = """
                         INSERT INTO mabi_raw.auction_logs
                         (event_type, item_id, auction_buy_id, item_name, item_display_name, item_count, item_category, price, registered_at, auction_duration, ended_at, created_at, options)
@@ -247,12 +206,10 @@ class AuctionDbSink:
                     """
                     execute_batch(cur, sql_log, batch_logs)
 
-                # (2) Delete Listings
                 if batch_del_ids:
                     sql_del = "DELETE FROM mabi_raw.current_listings WHERE item_id = %s"
                     execute_batch(cur, sql_del, batch_del_ids)
 
-                # (3) Insert Listings - [수정] options 컬럼 추가
                 if batch_ins_list:
                     sql_ins = """
                         INSERT INTO mabi_raw.current_listings
@@ -272,7 +229,6 @@ class AuctionDbSink:
             self.event_buffer.clear()
             self.last_flush_time = time.time()
 
-# 실행
 consumer = KafkaConsumer(
     TOPIC_EVENTS,
     bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,

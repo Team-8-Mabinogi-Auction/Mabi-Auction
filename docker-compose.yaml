@@ -3,7 +3,7 @@ version: '3.8'
 services:
   kafka:
     image: confluentinc/cp-kafka:latest
-    container_name: kafka-broker
+    container_name: kafka  # [수정] kafka-broker에서 kafka로 변경
     ports:
       - "9092:9092"
     environment:
@@ -16,115 +16,167 @@ services:
       KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
-      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_NUM_PARTITIONS: 1
+    networks:
+      - auction-network
     volumes:
       - ./kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-cluster cluster-id --bootstrap-server localhost:29092 || exit 1"] # [수정] 더 정확한 Kafka 체크 명령어
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
-    depends_on: [kafka]
+    depends_on:
+      kafka:
+        condition: service_healthy # [수정] Kafka가 건강할 때만 시작
     ports:
       - "8080:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: local-kraft
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    networks:
+      - auction-network
 
-  # 1. 소비성 아이템 수집기
+  # --- 아래 모든 서비스의 depends_on 형식을 변경합니다 ---
+
   producer-consumable:
     build: { context: ., dockerfile: Dockerfile }
     command: python kafka_auction/collector/producer_consumable.py 
     restart: on-failure
-    depends_on: [kafka]
+    depends_on:
+      kafka:
+        condition: service_healthy # [수정]
     env_file: .env 
     environment:
       - KAFKA_SERVER=kafka:29092
       - PYTHONPATH=/app
+    networks:
+      - auction-network
 
-  # 2. 장비류 수집기 
   producer-equip:
     build: { context: ., dockerfile: Dockerfile }
     command: python kafka_auction/collector/producer_listings.py 
     restart: on-failure
-    depends_on: [kafka]
+    depends_on:
+      kafka:
+        condition: service_healthy # [수정]
     env_file: .env
     environment:
       - KAFKA_SERVER=kafka:29092
       - PYTHONPATH=/app
+    networks:
+      - auction-network
 
-  # 3. 거래 내역 수집기
   producer-history:
     build: { context: ., dockerfile: Dockerfile }
     command: python kafka_auction/collector/producer_history.py 
     restart: on-failure
-    depends_on: [kafka]
+    depends_on:
+      kafka:
+        condition: service_healthy # [수정]
     env_file: .env 
     environment:
       - KAFKA_SERVER=kafka:29092
       - PYTHONPATH=/app
+    networks:
+      - auction-network
 
-  # 4. 이상거래 탐지기
   anomaly-detector:
     build: { context: ., dockerfile: Dockerfile }
     command: python kafka_auction/processor/anomaly_detector.py
     restart: on-failure
-    depends_on: [kafka]
+    depends_on:
+      kafka:
+        condition: service_healthy # [수정]
     env_file: .env
     environment:
       - KAFKA_SERVER=kafka:29092
       - PYTHONPATH=/app
+    networks:
+      - auction-network
 
-  # 5. 이벤트 프로세서
-  event-processor:
+  event-processor-equipment:
     build: { context: ., dockerfile: Dockerfile }
     env_file: .env
     command: python kafka_auction/processor/processor_equipment_events.py 
     restart: on-failure
-    depends_on: [kafka]
+    depends_on:
+      kafka:
+        condition: service_healthy # [수정]
     environment:
-      - KAFKA_BROKER=kafka:9092
+      - KAFKA_BROKER=kafka:29092
       - PYTHONPATH=/app
+    networks:
+      - auction-network
 
-  # 6. DB 적재기
+  event-processor-consumable:
+    build: { context: ., dockerfile: Dockerfile }
+    env_file: .env
+    command: python kafka_auction/processor/processor_consumable_events.py 
+    restart: on-failure
+    depends_on:
+      kafka:
+        condition: service_healthy # [수정]
+    environment:
+      - KAFKA_BROKER=kafka:29092
+      - PYTHONPATH=/app
+    networks:
+      - auction-network
+
   db-sink-consumer:
     build: { context: ., dockerfile: Dockerfile }
     command: python kafka_auction/sink/consumer_db_sink.py 
     restart: on-failure
-    depends_on: [kafka]
+    depends_on:
+      kafka:
+        condition: service_healthy # [수정]
     env_file: .env
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BROKER}
       - TOPIC_EVENTS=${KAFKA_TOPIC_EVENTS}
-      - KAFKA_SINK_GROUP_ID=${KAFKA_DB_SINK_GROUP_ID}  # 그룹 ID 매핑
+      - KAFKA_SINK_GROUP_ID=${KAFKA_DB_SINK_GROUP_ID}
       - PYTHONPATH=/app
+    networks:
+      - auction-network 
 
-  # 7. S3 적재기 - 거래 목록
   s3-listings-loader:
     build: { context: ., dockerfile: Dockerfile }
     command: python kafka_auction/sink/s3_listings_loader.py 
     restart: on-failure
-    depends_on: [kafka]
+    depends_on:
+      kafka:
+        condition: service_healthy # [수정]
     env_file: .env
     environment:
       - KAFKA_SERVER=kafka:29092
       - PYTHONPATH=/app
       - SPOOL_DIR=/app/spool/listings
+    networks:
+      - auction-network
     volumes:
       - ./spool/listings:/app/spool/listings
 
-  # 8. S3 적재기 - 거래 내역
   s3-history-loader:
     build: { context: ., dockerfile: Dockerfile }  
     command: python kafka_auction/sink/s3_history_loader.py
     restart: on-failure
-    depends_on: [kafka]
+    depends_on:
+      kafka:
+        condition: service_healthy # [수정]
     env_file: .env 
     environment:
       - KAFKA_SERVER=kafka:29092
       - PYTHONPATH=/app
       - SPOOL_DIR=/app/spool/history 
-      - ./spool/history:/app/spool/history 
+    networks:
+      - auction-network
+    volumes:
+      - ./spool/history:/app/spool/history
 
 networks:
-  default:
-    name: auction-network
+  auction-network:
+    driver: bridge

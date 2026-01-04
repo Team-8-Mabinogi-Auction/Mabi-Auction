@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Tuple
 import time
 
@@ -67,7 +67,9 @@ def run_listings_cycle(category: str, cycle_id: str) -> None:
         category: 처리할 소비 카테고리
         cycle_id: 전체 카테고리 공통 사이클 식별자(END_OF_CYCLE과 동일한 값)
     """
-    category_started_at_dt = datetime.now(timezone.utc)
+    
+    KST = timezone(timedelta(hours=9))
+    category_started_at_dt = datetime.now(KST)
 
     auction_item_category = category
 
@@ -134,7 +136,7 @@ def run_listings_cycle(category: str, cycle_id: str) -> None:
 
         cursor = next_cursor
 
-    category_ended_at_dt = datetime.now(timezone.utc)
+    category_ended_at_dt = datetime.now(KST)
     elapsed_seconds = (category_ended_at_dt - category_started_at_dt).total_seconds()
 
     logger.info(
@@ -154,9 +156,10 @@ if __name__ == "__main__":
             cycle_count += 1
             if cycle_count > 1:
                 logger.info(">>> Waiting for 3 minutes (180 seconds) before next cycle...")
-                time.sleep(210)
+                time.sleep(185)
 
-            cycle_id = datetime.now(timezone.utc).isoformat()
+            KST = timezone(timedelta(hours=9))
+            cycle_id = datetime.now(KST).isoformat()
             logger.info(f">>> Execution Start (Cycle {cycle_count}), cycle_id={cycle_id}")
 
             for category in CONSUMABLE_CATEGORIES:

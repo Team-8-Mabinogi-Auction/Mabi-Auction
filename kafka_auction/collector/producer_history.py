@@ -141,6 +141,7 @@ def run_history_cycle() -> None:
 if __name__ == "__main__":
     try:
         cycle_count = 0
+        time.sleep(90)
         while True:
             cycle_count += 1
             if cycle_count > 1:

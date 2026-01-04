@@ -51,6 +51,9 @@
 - **Infra**: AWS EC2 / RDS / ElastiCache
 
 ### 시스템 아키텍처(요약)
+#### 1) 그림
+<img src="docs/images/Mabi-Auction-Architecture.png" width="700" />
+
 
 ```text
 NEXON Open API

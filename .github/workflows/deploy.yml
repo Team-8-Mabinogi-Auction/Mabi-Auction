@@ -1,0 +1,88 @@
+name: Deploy (main -> 3 EC2)
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  ec2-1-kafka:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: tar -czf kafka.tgz Dockerfile docker-compose.yaml kafka_auction
+
+      - uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_1_HOST }}
+          username: ${{ secrets.EC2_1_USER }}
+          key: ${{ secrets.EC2_1_KEY }}
+          source: "kafka.tgz"
+          target: "/home/ec2-user/"
+
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_1_HOST }}
+          username: ${{ secrets.EC2_1_USER }}
+          key: ${{ secrets.EC2_1_KEY }}
+          script: |
+            set -e
+            cd /home/ec2-user/Mabi-Auction
+            tar -xzf /home/ec2-user/kafka.tgz
+            docker compose up -d --build
+
+  ec2-2-django-plus-airflow-up:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: tar -czf django.tgz django
+
+      - uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_2_HOST }}
+          username: ${{ secrets.EC2_2_USER }}
+          key: ${{ secrets.EC2_2_KEY }}
+          source: "django.tgz"
+          target: "/home/ec2-user/"
+
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_2_HOST }}
+          username: ${{ secrets.EC2_2_USER }}
+          key: ${{ secrets.EC2_2_KEY }}
+          script: |
+            set -e
+
+            # Django 반영 + 재기동
+            mkdir -p /home/ec2-user/django_mabi
+            cd /home/ec2-user/django_mabi
+            tar -xzf /home/ec2-user/django.tgz
+            docker compose up -d --build
+
+            # Airflow는 코드 반영 없이 up만
+            cd /home/ec2-user/airflow
+            docker compose up -d
+
+  ec2-3-airflow-dags:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: tar -czf dags.tgz airflow/dags
+
+      - uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_3_HOST }}
+          username: ${{ secrets.EC2_3_USER }}
+          key: ${{ secrets.EC2_3_KEY }}
+          source: "dags.tgz"
+          target: "/home/ec2-user/"
+
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_3_HOST }}
+          username: ${{ secrets.EC2_3_USER }}
+          key: ${{ secrets.EC2_3_KEY }}
+          script: |
+            set -e
+            mkdir -p /home/ec2-user/airflow-docker
+            tar -xzf /home/ec2-user/dags.tgz -C /home/ec2-user/airflow-docker
+            echo "DAGs updated (auto-discover)."

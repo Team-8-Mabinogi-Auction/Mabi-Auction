@@ -20,4 +20,5 @@ from django.urls import path, include
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('Mabi_Auction_app.urls')), # 앱의 urls.py 연결
+    path('', include('django_prometheus.urls')),
 ]

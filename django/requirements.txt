@@ -4,3 +4,4 @@ redis
 django-redis
 requests
 psycopg2-binary
+django-prometheus

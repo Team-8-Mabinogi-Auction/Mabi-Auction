@@ -1,0 +1,12 @@
+services:
+  django-app:
+    build: .
+    image: mabi-auction-web:latest
+    container_name: django-mabi-app
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/code

@@ -59,7 +59,8 @@ KEY_SNAPSHOT_CURRENT = 'stackable:snapshot:current'
 KEY_SNAPSHOT_PREV = 'stackable:snapshot:prev'
 KEY_META_INFO = 'stackable:meta'
 KEY_PREFIX_HISTORY_LIST = 'stackable:hist_list:' 
-KEY_DIRTY_SIGS = 'stackable:dirty_sigs'          
+KEY_DIRTY_SIGS = 'stackable:dirty_sigs'
+KEY_RECENT_ITEMS = 'recent:items'          
 
 # 초기화
 redis_client = redis.Redis(
@@ -215,6 +216,30 @@ def process_listing(data):
         'auction_duration': duration
     }
     pipe.hset(KEY_META_INFO, full_sig, json.dumps(meta))
+
+    if final_start_time: 
+        recent_info = {
+            'item_id': full_sig,
+            'item_name': raw_item.get('item_display_name'),
+            'item_category': raw_item.get('auction_item_category'),
+            'price_per_unit': raw_item.get('auction_price_per_unit'),
+            'item_count': count,
+            'total_price': (raw_item.get('auction_price_per_unit') or 0) * count,
+            'registered_at': final_start_time, 
+            'expire_time': expire_kst,
+            'duration': duration,
+            'item_option': []
+        }
+        try:
+            dt_obj = datetime.fromisoformat(final_start_time.replace('Z', '+00:00'))
+            score = dt_obj.timestamp()
+            
+            pipe.zadd(KEY_RECENT_ITEMS, {json.dumps(recent_info, ensure_ascii=False): score})
+            
+            pipe.zremrangebyrank(KEY_RECENT_ITEMS, 0, -101)
+        except Exception as e:
+            logger.warning(f"Failed to add to recent:items: {e}")
+
     pipe.execute()
 
 def process_history(data):

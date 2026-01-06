@@ -44,10 +44,14 @@ def get_item_details_map():
     return item_details_map
 
 def get_recent_alerts(limit=5):
-    """Redis에서 실시간 사재기 알림 로드"""
+    """Redis에서 실시간 사재기 알림 로드 (WARNING 우선 노출)"""
     alerts = []
     con = get_redis_connection("default")
-    raw_list = con.lrange("view:recent_alerts", 0, limit - 1)
+    
+    # [수정 1] 정렬을 위해 요청된 limit보다 더 많은 데이터를 조회합니다.
+    # 최근 데이터 속에 묻혀있는 WARNING을 끌어올리기 위함입니다.
+    fetch_limit = 20 
+    raw_list = con.lrange("view:recent_alerts", 0, fetch_limit - 1)
     
     # 시스템 시간 사용 (Naive)
     now = datetime.now()
@@ -73,28 +77,42 @@ def get_recent_alerts(limit=5):
             reason_code = data.get('reason')
             ref_price = data.get('ref_price_avg', 0)
             reg_price = data.get('reg_price', 0)
+            velocity = data.get('velocity_10min', 0)
 
             price_multiplier = reg_price / ref_price if ref_price else 0
 
+            # [수정 2] 우선순위(priority) 할당: 낮을수록 상단 노출
             if reason_code == "MANIPULATION":
                 data['level_text'] = "경고"
                 data['level_class'] = "badge-danger"
                 data['reason_text'] = f"평균 대비 {price_multiplier:.1f}배 고가로 등록되었습니다."
                 data['badge_tag'] = "시세조작"
+                data['priority'] = 0  # 1순위
 
             elif reason_code == "SWEEPING":
-                velocity = data.get('velocity_10min', 0)
+                if velocity <= 5:
+                    continue  # 5개 이하면 건너뜀
+
                 data['level_text'] = "의심"
                 data['level_class'] = "badge-warn"
                 data['reason_text'] = f"{velocity}개의 매물이 판매되었습니다. ({ratio*100:.0f}% 소진)"
-                data['badge_tag'] = "대량구매"
+                data['badge_tag'] = "대량판매"
+                data['priority'] = 1  # 2순위
+            
+            else:
+                data['priority'] = 2  # 그 외
 
             alerts.append(data)
         except Exception as e:
             print(f"Parsing Error: {e}")
             continue
-            
-    return alerts
+    
+    # [수정 3] 우선순위 기준 정렬 (Stable Sort)
+    # priority가 낮은 순(0->1->2)으로 정렬되되, 같은 우선순위끼리는 Redis 최신순(기존 순서) 유지
+    alerts.sort(key=lambda x: x.get('priority', 2))
+
+    # [수정 4] 정렬 후 요청된 개수만큼 자르기
+    return alerts[:limit]
 
 def format_mabi_options(options_data):
     """
@@ -420,9 +438,7 @@ def item_detail(request, item_name):
         category = sales_history[0].item_category
 
     # 옵션 유무 판단
-    listings_has_opt = current_listings.exclude(options__isnull=True).exclude(options__exact='').exists()
-    history_has_opt = sales_history.exclude(options__isnull=True).exclude(options__exact='').exists()
-    has_options = listings_has_opt or history_has_opt
+    has_options = False
 
     # 객체에 파싱된 옵션 및 시간 정보 붙이기
     for item in current_listings:
@@ -436,6 +452,8 @@ def item_detail(request, item_name):
         
         if raw_options:
             item.parsed_options = format_mabi_options(raw_options)
+            if item.parsed_options:
+                has_options = True
         else:
             item.parsed_options = []
         
@@ -472,6 +490,8 @@ def item_detail(request, item_name):
         
         if raw_options:
             item.parsed_options = format_mabi_options(raw_options)
+            if item.parsed_options:
+                has_options = True
         else:
             item.parsed_options = []
 

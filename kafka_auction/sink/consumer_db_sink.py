@@ -45,6 +45,7 @@ class AuctionDbSink:
     def __init__(self):
         self.conn = None
         self.connect_db()
+        self.cleanup_expired_items()
         self.event_buffer = [] 
         self.last_flush_time = time.time()
 
@@ -58,6 +59,27 @@ class AuctionDbSink:
             logger.error(f"DB 연결 실패: {e}", exc_info=True) 
             time.sleep(5)
             self.connect_db()
+
+    def cleanup_expired_items(self):
+        try:
+            logger.info("Checking for expired listings...")
+            now = datetime.now(KST)
+            
+            with self.conn.cursor() as cur:
+                # expire_time이 현재 시간보다 작은(과거인) 행 삭제
+                sql = "DELETE FROM mabi_raw.current_listings WHERE expire_time < %s"
+                cur.execute(sql, (now,))
+                deleted_count = cur.rowcount
+            
+            self.conn.commit()
+            if deleted_count > 0:
+                logger.info(f"Startup Cleanup: Deleted {deleted_count} expired items from DB.")
+            else:
+                logger.info("Startup Cleanup: No expired items found.")
+                
+        except Exception as e:
+            logger.error(f"Failed to cleanup expired items: {e}", exc_info=True)
+            self.conn.rollback()
 
     def parse_time(self, time_str):
         if not time_str: return None

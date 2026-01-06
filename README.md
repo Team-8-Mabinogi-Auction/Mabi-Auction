@@ -9,6 +9,7 @@
 - [데이터 파이프라인 상세](#데이터-파이프라인-상세)
 - [역할 및 협업 방식](#역할-및-협업-방식)
 - [프로젝트 폴더 구조](#프로젝트-폴더-구조)
+- [최종 결과물](#최종-결과물)
 - [모니터링](#모니터링)
 
 ## 프로젝트 소개
@@ -78,6 +79,18 @@ Django → 실시간 목록(주로 Redis) + 검색/차트/상세(주로 PostgreS
 - `GET /mabinogi/v1/auction/list`
 - `GET /mabinogi/v1/auction/history`
 
+### 데이터 모델
+
+<img src="docs/images/mabi-erd.png" width="700" />
+
+
+| 테이블 | 용도 |
+| --- | --- |
+| CURRENT_LISTINGS | 현재 경매장에 등록된 활성 매물의 실시간 상태를 보관하는 스냅샷 테이블 |
+| AUTION_LOGS | 아이템의 이벤트(등록, 판매, 취소)를 시계열로 기록하는 원천 로그 테이블 |
+| ITEM_DISPLAY_HOURLY_STATS | `AUCTION_LOGS`를 바탕으로 1시간 단위로 집계된 아이템별 통계 데이터 테이블 |
+| ANONMALY_LOGS | 모든 적재 레이어에서 감지된 비정상 데이터(사재기, 덤핑 시세 등)를 독립적으로 기록하는 테이블 |
+
 ### Kafka 토픽(기본값)
 
 기본값은 `kafka_auction/config/settings.py`에 있으며, 운영에서는 `.env`로 관리합니다.
@@ -92,7 +105,10 @@ Django → 실시간 목록(주로 Redis) + 검색/차트/상세(주로 PostgreS
 
 ## 데이터 파이프라인 상세
 
-### 1) 데이터 수집(Collector)
+### 1) 데이터 흐름도
+<img src="docs/images/Mabi-Auction-Data-Flow.drawio.png" width="700" />
+
+### 2) 데이터 수집(Collector)
 
 - `kafka_auction/collector/producer_listings.py`: 장비 매물 수집 → raw 토픽 적재
 - `kafka_auction/collector/producer_consumable.py`: 소모품 매물 수집 → raw 토픽 적재
@@ -100,7 +116,7 @@ Django → 실시간 목록(주로 Redis) + 검색/차트/상세(주로 PostgreS
 
 모든 Collector는 `next_cursor` 기반 페이지네이션을 반복하며, Kafka로 JSON payload를 전송합니다.
 
-### 2) 이벤트 처리(Processor)
+### 3) 이벤트 처리(Processor)
 
 - `kafka_auction/processor/processor_equipment_events.py`
 - `kafka_auction/processor/processor_consumable_events.py`
@@ -111,7 +127,7 @@ Django → 실시간 목록(주로 Redis) + 검색/차트/상세(주로 PostgreS
 - 중복/지연/초기 동기화 구간을 고려해 `skip_anomaly_detection`, `is_ghost` 플래그를 부여
 - Django 메인 화면을 위한 실시간 캐시 키를 Redis에 갱신(예: `recent:items`)
 
-### 3) 이상 탐지(Anomaly Detector)
+### 4) 이상 탐지(Anomaly Detector)
 
 - `kafka_auction/processor/anomaly_detector.py`
 
@@ -125,12 +141,12 @@ Django → 실시간 목록(주로 Redis) + 검색/차트/상세(주로 PostgreS
   - Kafka: anomaly 토픽(선택적 연계)
   로 전달
 
-### 4) 적재(Storage)
+### 5) 적재(Storage)
 
 - **PostgreSQL(RDS)**: `kafka_auction/sink/consumer_db_sink.py`가 `mabi_auction.current_listings`, `mabi_auction.auction_logs`로 배치 적재
 - **S3**: `kafka_auction/sink/s3_listings_loader.py`, `kafka_auction/sink/s3_history_loader.py`가 raw 토픽을 `.jsonl.gz`로 업로드(시간 파티셔닝)
 
-### 5) 배치 집계(Airflow)
+### 6) 배치 집계(Airflow)
 
 - DAG: `airflow/dags/mabi_item_stats_dag.py` (`@hourly`)
 - 결과: `mabi_analytics.item_display_hourly_stats`
@@ -178,6 +194,14 @@ Mabi-Auction/
 ├── Dockerfile                     
 └── README.md
 ```
+
+## 최종 결과물
+
+### 1) 메인화면
+<img src="docs/images/mainpage.png" width="700" />
+
+### 2) 상세화면
+<img src="docs/images/details.png" width="700" />
 
 ## 모니터링
 
